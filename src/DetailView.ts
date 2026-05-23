@@ -85,7 +85,7 @@ export class StarNestDetailView extends ItemView {
 
 		infoCard.createDiv('info-row').innerHTML = `<span class="label">创建时间</span><span class="value">${repo.createdAt || '-'}</span>`;
 		infoCard.createDiv('info-row').innerHTML = `<span class="label">最后推送</span><span class="value">${repo.updatedAt || '-'}</span>`;
-		infoCard.createDiv('info-row').innerHTML = `<span class="label">Star 数量</span><span class="value accent">⭐ ${this.formatNumber(repo.stars)}</span>`;
+		infoCard.createDiv('info-row').innerHTML = `<span class="label">Star 数量</span><span class="value accent">${this.formatNumber(repo.stars)}</span>`;
 		infoCard.createDiv('info-row').innerHTML = `<span class="label">Fork 数量</span><span class="value">${this.formatNumber(repo.forks)}</span>`;
 
 		if (repo.language) {
@@ -114,7 +114,7 @@ export class StarNestDetailView extends ItemView {
 		linkCard.createEl('h3', { text: '链接' });
 
 		linkCard.createEl('a', {
-			text: '↗ 在 Github 查看',
+			text: '在 Github 查看',
 			cls: 'info-link',
 			href: '#'
 		}).addEventListener('click', async (e) => {
@@ -124,7 +124,7 @@ export class StarNestDetailView extends ItemView {
 		});
 
 		linkCard.createEl('a', {
-			text: '↗ 在 Zread 查看',
+			text: '在 Zread 查看',
 			cls: 'info-link',
 			href: '#'
 		}).addEventListener('click', async (e) => {
@@ -134,7 +134,7 @@ export class StarNestDetailView extends ItemView {
 		});
 
 		linkCard.createEl('a', {
-			text: '↗ 在 DeepWiKi 查看',
+			text: '在 DeepWiKi 查看',
 			cls: 'info-link',
 			href: '#'
 		}).addEventListener('click', async (e) => {
@@ -145,7 +145,7 @@ export class StarNestDetailView extends ItemView {
 
 
 		linkCard.createEl('a', {
-			text: '📋 复制 Clone URL',
+			text: '复制 Clone URL',
 			cls: 'info-link',
 			href: '#'
 		}).addEventListener('click', (e) => {
@@ -155,7 +155,7 @@ export class StarNestDetailView extends ItemView {
 		});
 
 		linkCard.createEl('a', {
-			text: '📝 创建笔记',
+			text: '创建笔记',
 			cls: 'info-link',
 			href: '#'
 		}).addEventListener('click', async (e) => {

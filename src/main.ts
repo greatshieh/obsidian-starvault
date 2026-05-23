@@ -11,6 +11,8 @@ import { StarNestSettingTab } from './settings';
 import { Octokit } from 'octokit';
 import { db, githubRepoToDBRepo } from './db';
 import { searchService } from './search';
+import * as languageColorsRaw from './color.json';
+const languageColors = languageColorsRaw as Record<string, string>;
 
 // 插件设置接口
 interface StarNestSettings {
@@ -43,7 +45,7 @@ starred-at: {{starred-at}}
 updated_at: {{updated_at}}
 created-at: {{created-at}}
 language: {{language}}
-tags:
+topics:
 {{tags}}
 url: {{url}}
 ---
@@ -521,23 +523,7 @@ export default class StarNestPlugin extends Plugin {
 	 * 获取语言颜色
 	 */
 	private getLanguageColor(language: string | null): string {
-		const colors: Record<string, string> = {
-			'TypeScript': '#3178c6',
-			'JavaScript': '#f1e05a',
-			'Rust': '#dea584',
-			'Python': '#3572A5',
-			'Go': '#00ADD8',
-			'Vue': '#41b883',
-			'React': '#61dafb',
-			'Java': '#b07219',
-			'C++': '#f34b7d',
-			'C': '#555555',
-			'Ruby': '#701516',
-			'PHP': '#4F5D95',
-			'Swift': '#ffac45',
-			'Kotlin': '#A97BFF',
-		};
-		return colors[language || ''] || '#8b949e';
+		return languageColors[language || ''] || '#8b949e';
 	}
 
 	/**
@@ -630,7 +616,7 @@ export default class StarNestPlugin extends Plugin {
 			let content = this.settings.noteTemplate;
 
 			// 处理 tags（topics）- 将数组转换为 YAML 格式的列表
-			const tagsStr = (repo.topics || []).map(tag => `  - ${tag}`).join('\n');
+			const topicsStr = (repo.topics || []).map(topic => `  - ${topic}`).join('\n');
 
 			content = content
 				.replace(/\{\{repo\}\}/g, repo.name)
@@ -640,7 +626,7 @@ export default class StarNestPlugin extends Plugin {
 				.replace(/\{\{updated_at\}\}/g, repo.updatedAt || '')
 				.replace(/\{\{created-at\}\}/g, repo.createdAt || '')
 				.replace(/\{\{language\}\}/g, repo.language || '')
-				.replace(/\{\{tags\}\}/g, tagsStr)
+				.replace(/\{\{tags\}\}/g, topicsStr)
 				.replace(/\{\{url\}\}/g, repo.url || `https://github.com/${repo.owner}/${repo.name}`)
 				.replace(/\{\{repo\.name\}\}/g, repo.name)
 				.replace(/\{\{repo\.owner\}\}/g, repo.owner)

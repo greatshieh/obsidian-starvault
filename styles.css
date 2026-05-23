@@ -758,6 +758,15 @@
   background: rgba(128, 128, 128, 0.5);
 }
 
+.starnest-readme-view .readme-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--text-faint);
+}
+
 .starnest-readme-view .markdown-body {
   padding: var(--file-margins);
   margin: 0 auto;

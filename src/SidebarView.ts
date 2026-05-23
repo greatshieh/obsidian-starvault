@@ -14,6 +14,7 @@ import { ItemView, WorkspaceLeaf, setIcon, Menu, TFile, Notice } from 'obsidian'
 import StarNestPlugin from './main';
 import { db, DBRepo } from './db';
 import { searchService } from './search';
+import { ICONS } from 'constant';
 
 export const VIEW_TYPE_STARNEST_SIDEBAR = 'starnest-sidebar';
 
@@ -423,9 +424,18 @@ export class StarNestSidebarView extends ItemView {
 
     // 元信息（Star 数、Fork 数、更新时间）
     const meta = repoEl.createDiv('repo-item-meta');
-    meta.createSpan({ text: `⭐ ${this.formatNumber(repo.stars)}` });
-    meta.createSpan({ text: `🍴 ${this.formatNumber(repo.forks)}` });
-    meta.createSpan({ text: repo.updatedAt });
+    
+    // Star 数
+    const starSpan = meta.createSpan();
+    starSpan.innerHTML = `${ICONS.star} ${this.formatNumber(repo.stars)}`;
+    
+    // Fork 数
+    const forkSpan = meta.createSpan();
+    forkSpan.innerHTML = `${ICONS.fork} ${this.formatNumber(repo.forks)}`;
+    
+    // 更新时间
+    const updatedSpan = meta.createSpan();
+    updatedSpan.innerHTML = `${ICONS.updated} ${repo.updatedAt}`;
 
     // 标签
     if (repo.tags.length > 0) {

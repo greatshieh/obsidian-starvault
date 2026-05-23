@@ -16,6 +16,8 @@
 		"strictNullChecks": true,
 		"strictBindCallApply": true,
 		"allowSyntheticDefaultImports": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
 		"useUnknownInCatchVariables": true,
 		"lib": [
 			"DOM",
@@ -25,6 +27,7 @@
 		]
 	},
 	"include": [
-		"src/**/*.ts"
+		"src/**/*.ts",
+		"src/**/*.json"
 	]
 }
