@@ -1,8 +1,764 @@
-/*
+/**
+ * StarNest Plugin Styles
+ * Obsidian 侧边栏视图样式
+ */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+/* ════════════════════════════════════════════════════════════════════════
+   全局字体大小设置
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-sidebar-view,
+.starnest-detail-view {
+  font-size: 14px;
+}
 
-If your plugin does not need CSS, delete this file.
+/* 用户信息区域字体 */
+.starnest-sidebar-view .user-name {
+  font-size: 14px;
+}
 
-*/
+.starnest-sidebar-view .user-count {
+  font-size: 12px;
+}
+
+/* 仓库列表字体 */
+.starnest-sidebar-view .repo-item-name {
+  font-size: 14px;
+}
+
+.starnest-sidebar-view .repo-item-desc {
+  font-size: 12px;
+}
+
+.starnest-sidebar-view .repo-item-meta {
+  font-size: 12px;
+}
+
+.starnest-sidebar-view .repo-item-tag {
+  font-size: 12px;
+}
+
+/* 搜索框字体 */
+.starnest-sidebar-view .search-input {
+  font-size: 13px;
+}
+
+/* 过滤器标签字体 */
+.starnest-sidebar-view .filter-pill {
+  font-size: 12px;
+}
+
+/* 详情视图字体 */
+.starnest-detail-view .info-card h3 {
+  font-size: 12px;
+}
+
+.starnest-detail-view .info-row {
+  font-size: 12px;
+}
+
+.starnest-detail-view .info-tag {
+  font-size: 12px;
+}
+
+.starnest-detail-view .info-link {
+  font-size: 12px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   侧边栏视图容器
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-sidebar-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   用户信息区域
+   ════════════════════════════════════════════════════════════════════════ */
+.user-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+  min-width: 0;
+}
+
+.user-container:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* 用户头像 */
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--background-secondary);
+}
+
+/* 用户信息 */
+.user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-count {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* 下拉箭头 */
+.user-dropdown-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+  transition: opacity 0.1s;
+  flex-shrink: 0;
+}
+
+.user-container:hover .user-dropdown-icon {
+  opacity: 1;
+}
+
+.user-dropdown-icon svg {
+  width: 14px;
+  height: 14px;
+  color: var(--icon-color);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   标题栏 (Sidebar Header)
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.starnest-header .nav-header-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.starnest-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: #e0af68;
+}
+
+.starnest-header-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.starnest-count-badge {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-faint);
+  margin-left: 2px;
+}
+
+/* 标题栏按钮 */
+.starnest-header .nav-action-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  opacity: 0.7;
+  transition: all 0.1s ease;
+}
+
+.starnest-header .nav-action-button:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  opacity: 1;
+}
+
+.starnest-header .nav-action-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 同步按钮旋转动画 */
+.starnest-sync-btn.is-syncing svg {
+  animation: starnest-spin 1s linear infinite;
+}
+
+@keyframes starnest-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   搜索区域
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-search-container {
+  padding: 8px 8px 4px;
+  flex-shrink: 0;
+}
+
+.starnest-search-container .search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.starnest-search-container .search-icon {
+  position: absolute;
+  left: 8px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-faint);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.starnest-search-container .search-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.starnest-search-container .search-input {
+  width: 100%;
+  height: 28px;
+  padding: 0 24px 0 28px;
+  background: var(--background-primary);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-family: var(--font-interface-theme);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.starnest-search-container .search-input::placeholder {
+  color: var(--text-faint);
+}
+
+.starnest-search-container .search-input:focus {
+  border-color: var(--interactive-accent);
+}
+
+.starnest-search-container .search-clear-button {
+  position: absolute;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-faint);
+  border-radius: 3px;
+  transition: all 0.1s;
+}
+
+.starnest-search-container .search-clear-button:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+
+.starnest-search-container .search-clear-button svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   过滤器标签
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-filter-container {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+
+.starnest-filter-container::-webkit-scrollbar {
+  display: none;
+}
+
+.starnest-filter-container .filter-pill {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.1s;
+  background: var(--background-modifier-hover);
+  color: var(--text-faint);
+  border: 1px solid transparent;
+}
+
+.starnest-filter-container .filter-pill:hover {
+  color: var(--text-muted);
+  border-color: var(--background-modifier-border);
+}
+
+.starnest-filter-container .filter-pill.active {
+  background: rgba(100, 140, 255, 0.12);
+  color: var(--text-accent);
+  border-color: rgba(100, 140, 255, 0.2);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   仓库列表
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-repo-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 4px;
+}
+
+.starnest-repo-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.starnest-repo-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.starnest-repo-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 3px;
+}
+
+.starnest-repo-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* 仓库卡片 */
+.starnest-repo-item {
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.08s;
+  margin-bottom: 1px;
+  border: 1px solid transparent;
+}
+
+.starnest-repo-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.starnest-repo-item.active {
+  background: rgba(100, 140, 255, 0.08);
+  border-color: rgba(100, 140, 255, 0.1);
+}
+
+.starnest-repo-item.active .repo-item-name {
+  color: var(--text-accent);
+}
+
+/* 仓库头部 */
+.repo-item-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 3px;
+}
+
+.repo-item-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+}
+
+/* 头像渐变色类 */
+.repo-item-avatar.gradient-0 {
+  background: linear-gradient(135deg, #7aa2f7, #bb9af7);
+}
+
+.repo-item-avatar.gradient-1 {
+  background: linear-gradient(135deg, #ff9e64, #f7768e);
+}
+
+.repo-item-avatar.gradient-2 {
+  background: linear-gradient(135deg, #9ece6a, #7aa2f7);
+}
+
+.repo-item-avatar.gradient-3 {
+  background: linear-gradient(135deg, #1a1a2e, #e94560);
+}
+
+.repo-item-avatar.gradient-4 {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+
+.repo-item-avatar.gradient-5 {
+  background: linear-gradient(135deg, #0f0f0f, #444);
+}
+
+.repo-item-avatar.gradient-6 {
+  background: linear-gradient(135deg, #e0af68, #ff9e64);
+}
+
+.repo-item-name {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.repo-item-lang {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 元信息 */
+.repo-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.repo-item-meta span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* 标签 */
+.repo-item-tags {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.repo-item-tag {
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(224, 175, 104, 0.12);
+  color: #e0af68;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   空状态
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.starnest-empty-state .empty-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--text-faint);
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+.starnest-empty-state .empty-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.starnest-empty-state .empty-title {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.starnest-empty-state .empty-desc {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   右键菜单样式增强
+   ════════════════════════════════════════════════════════════════════════ */
+.menu-item-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   滚动条通用样式
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-sidebar-view ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.starnest-sidebar-view ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.starnest-sidebar-view ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 3px;
+}
+
+.starnest-sidebar-view ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   响应式适配
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 400px) {
+  .starnest-repo-item {
+    padding: 6px 8px;
+  }
+  
+  .repo-item-desc {
+    line-clamp: 1;
+    -webkit-line-clamp: 1;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   右侧边栏详情视图 (按照 preview.html 样式)
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-detail-view {
+  height: 100%;
+  overflow: hidden;
+}
+
+.starnest-detail-view .readme-sidebar {
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.starnest-detail-view .readme-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.starnest-detail-view .readme-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 3px;
+}
+
+.starnest-detail-view .info-card {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.starnest-detail-view .info-card h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 8px;
+}
+
+.starnest-detail-view .info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.starnest-detail-view .info-row .label {
+  color: var(--text-faint);
+}
+
+.starnest-detail-view .info-row .value {
+  color: var(--text-muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.starnest-detail-view .info-row .value.accent {
+  color: var(--text-accent);
+}
+
+.starnest-detail-view .info-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.starnest-detail-view .info-tag {
+  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(100, 140, 255, 0.12);
+  color: var(--text-accent);
+  display: inline-block;
+  margin: 2px 3px 2px 0;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.starnest-detail-view .info-tag:hover {
+  background: rgba(100, 140, 255, 0.18);
+}
+
+.starnest-detail-view .info-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--link-color);
+  cursor: pointer;
+  background: var(--background-modifier-hover);
+  transition: background 0.1s;
+  text-decoration: none;
+  margin-bottom: 3px;
+}
+
+.starnest-detail-view .info-link:hover {
+  background: rgba(100, 140, 255, 0.15);
+}
+
+.starnest-detail-view .info-link:last-child {
+  margin-bottom: 0;
+}
+
+.starnest-detail-view .lang-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* 空状态 */
+.starnest-detail-view .detail-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+.starnest-detail-view .detail-empty-state .empty-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.starnest-detail-view .detail-empty-state .empty-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.starnest-detail-view .detail-empty-state .empty-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+}
+
+.starnest-detail-view .detail-empty-state .empty-desc {
+  font-size: 13px;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════
+   README 视图样式
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-readme-view {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.starnest-readme-view .readme-content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px;
+}
+
+.starnest-readme-view .readme-content-wrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.starnest-readme-view .readme-content-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.starnest-readme-view .readme-content-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
+  border-radius: 4px;
+}
+
+.starnest-readme-view .readme-content-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.5);
+}
+
+.starnest-readme-view .markdown-body {
+  padding: var(--file-margins);
+  margin: 0 auto;
+}

@@ -1,0 +1,2848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StarNest — Obsidian Plugin Prototype</title>
+  <style>
+    /* ════════════════════════════════════════════════════════════════════════
+     1:1 Obsidian Dark Theme Recreation
+     Pixel-accurate replication of Obsidian's native UI chrome.
+     ════════════════════════════════════════════════════════════════════════ */
+    :root {
+      --bg-primary: #1e1e1e;
+      --bg-primary-alt: #1a1a1a;
+      --bg-secondary: #252526;
+      --bg-secondary-alt: #1f1f1f;
+      --bg-tertiary: #2a2d2e;
+      --bg-modifier-hover: rgba(255, 255, 255, 0.04);
+      --bg-modifier-active-hover: rgba(255, 255, 255, 0.07);
+      --bg-modifier-border: rgba(255, 255, 255, 0.07);
+      --bg-modifier-border-hover: rgba(255, 255, 255, 0.14);
+      --bg-modifier-accent: rgba(100, 140, 255, 0.08);
+      --text-normal: #dcddde;
+      --text-muted: #999;
+      --text-faint: #666;
+      --text-accent: #7aa2f7;
+      --text-accent-hover: #89b4fa;
+      --text-on-accent: #ffffff;
+      --interactive-accent: #7aa2f7;
+      --interactive-accent-hover: #89b4fa;
+      --scrollbar-bg: transparent;
+      --scrollbar-thumb-bg: rgba(255, 255, 255, 0.07);
+      --scrollbar-thumb-hover-bg: rgba(255, 255, 255, 0.14);
+      --divider-color: rgba(255, 255, 255, 0.07);
+      --font-text-theme: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif;
+      --font-monospace-theme: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+      --font-interface-theme: var(--font-text-theme);
+      --icon-color: #9aa0a6;
+      --icon-color-hover: #b4bcc8;
+      --icon-color-active: #cdd6e4;
+      --icon-opacity: 0.7;
+      --tag-color: #e0af68;
+      --tag-background: rgba(224, 175, 104, 0.12);
+      --graph-line: rgba(255, 255, 255, 0.07);
+      --link-color: var(--text-accent);
+      --link-color-hover: var(--text-accent-hover);
+      --nav-item-color: var(--text-muted);
+      --nav-item-color-hover: var(--text-normal);
+      --nav-item-color-active: var(--text-accent);
+      --nav-item-background-hover: var(--bg-modifier-hover);
+      --nav-item-background-active: var(--bg-modifier-accent);
+      --tab-text-color: var(--text-muted);
+      --tab-text-color-focused: var(--text-normal);
+      --tab-text-color-focused-active: var(--text-accent);
+      --tab-background-active: var(--bg-primary);
+      --tab-text-color-active: var(--text-accent);
+      --tab-divider-color: var(--divider-color);
+      --titlebar-background: var(--bg-secondary);
+      --titlebar-background-focused: var(--bg-secondary);
+      --titlebar-text-color: var(--text-faint);
+      --titlebar-text-color-focused: var(--text-muted);
+      --status-bar-background: var(--bg-secondary);
+      --panel-border-color: var(--divider-color);
+      --modal-background: var(--bg-primary);
+      --modal-border: var(--bg-modifier-border);
+      --prompt-border: var(--interactive-accent);
+      --radius-s: 4px;
+      --radius-m: 6px;
+      --radius-l: 8px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-interface-theme);
+      background: var(--bg-primary);
+      color: var(--text-normal);
+      height: 100vh;
+      overflow: hidden;
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Obsidian Shell Layout
+     ════════════════════════════════════════════════════════════════════════ */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ── Title Bar ── */
+    .titlebar {
+      height: 30px;
+      flex-shrink: 0;
+      background: var(--titlebar-background);
+      display: flex;
+      align-items: center;
+      padding: 0 10px 0 8px;
+      -webkit-app-region: drag;
+      border-bottom: 1px solid var(--panel-border-color);
+    }
+
+    .titlebar-drag {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .titlebar-text {
+      font-size: 12px;
+      color: var(--titlebar-text-color);
+      letter-spacing: 0.02em;
+    }
+
+    .titlebar-buttons {
+      display: flex;
+      gap: 0;
+      -webkit-app-region: no-drag;
+    }
+
+    .titlebar-btn {
+      width: 46px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--icon-color);
+      transition: background 0.1s;
+    }
+
+    .titlebar-btn:hover {
+      background: var(--bg-modifier-hover);
+      color: var(--icon-color-hover);
+    }
+
+    .titlebar-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ── Main Body ── */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Left Sidebar
+     ════════════════════════════════════════════════════════════════════════ */
+    .sidebar-left {
+      width: 260px;
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--panel-border-color);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.15s ease;
+    }
+
+    .sidebar-left.collapsed {
+      width: 0;
+      overflow: hidden;
+      border-right-color: transparent;
+    }
+
+    /* Sidebar Header */
+    .sidebar-header {
+      height: 44px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      border-bottom: 1px solid var(--panel-border-color);
+      gap: 6px;
+    }
+
+    /* User Container */
+    .user-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      border-radius: var(--radius-m);
+      cursor: pointer;
+      transition: background 0.1s;
+      min-width: 0;
+    }
+
+    .user-container:hover {
+      background: var(--bg-modifier-hover);
+    }
+
+    /* User Avatar */
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--bg-modifier-accent);
+    }
+
+    /* User Info */
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-normal);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-count {
+      font-size: 10px;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+
+    /* Dropdown Icon */
+    .user-dropdown-icon {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-faint);
+      opacity: 0.6;
+      flex-shrink: 0;
+    }
+
+    .user-container:hover .user-dropdown-icon {
+      opacity: 1;
+    }
+
+    .user-dropdown-icon svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Header Actions */
+    .sidebar-header-actions {
+      display: flex;
+      gap: 2px;
+    }
+
+    .sidebar-header-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: var(--radius-s);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--icon-color);
+      opacity: var(--icon-opacity);
+      transition: all 0.1s;
+    }
+
+    .sidebar-header-btn:hover {
+      background: var(--bg-modifier-hover);
+      color: var(--icon-color-hover);
+      opacity: 1;
+    }
+
+    .sidebar-header-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Search */
+    .sidebar-search {
+      padding: 8px 8px 4px;
+      flex-shrink: 0;
+    }
+
+    .search-input-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-input-container svg {
+      position: absolute;
+      left: 8px;
+      width: 14px;
+      height: 14px;
+      color: var(--text-faint);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 28px;
+      padding: 0 8px 0 28px;
+      background: var(--bg-primary);
+      border: 1px solid transparent;
+      border-radius: var(--radius-s);
+      color: var(--text-normal);
+      font-size: 12px;
+      font-family: var(--font-interface-theme);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-faint);
+    }
+
+    .search-input:focus {
+      border-color: var(--interactive-accent);
+    }
+
+    /* Filter chips */
+    .sidebar-filters {
+      display: flex;
+      gap: 4px;
+      padding: 4px 8px 8px;
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+
+    .sidebar-filters::-webkit-scrollbar {
+      display: none;
+    }
+
+    .filter-pill {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.1s;
+      background: var(--bg-modifier-hover);
+      color: var(--text-faint);
+      border: 1px solid transparent;
+    }
+
+    .filter-pill:hover {
+      color: var(--text-muted);
+      border-color: var(--bg-modifier-border);
+    }
+
+    .filter-pill.active {
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+      border-color: rgba(100, 140, 255, 0.15);
+    }
+
+    /* Repo list */
+    .repo-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2px 4px;
+    }
+
+    .repo-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .repo-list::-webkit-scrollbar-track {
+      background: var(--scrollbar-bg);
+    }
+
+    .repo-list::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .repo-list::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover-bg);
+    }
+
+    .repo-item {
+      padding: 8px 10px;
+      border-radius: var(--radius-s);
+      cursor: pointer;
+      transition: background 0.08s;
+      margin-bottom: 1px;
+      border: 1px solid transparent;
+    }
+
+    .repo-item:hover {
+      background: var(--bg-modifier-hover);
+    }
+
+    .repo-item.active {
+      background: var(--nav-item-background-active);
+      border-color: rgba(100, 140, 255, 0.1);
+    }
+
+    .repo-item-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 3px;
+    }
+
+    .repo-item-avatar {
+      width: 18px;
+      height: 18px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .repo-item-name {
+      flex: 1;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-normal);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    .repo-item.active .repo-item-name {
+      color: var(--nav-item-color-active);
+    }
+
+    .repo-item-lang {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .repo-item-desc {
+      font-size: 11px;
+      color: var(--text-faint);
+      line-height: 1.35;
+      display: -webkit-box;
+      line-clamp: 2;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+
+    .repo-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 10.5px;
+      color: var(--text-faint);
+    }
+
+    .repo-item-meta span {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .repo-item-tags {
+      display: flex;
+      gap: 3px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+
+    .repo-item-tag {
+      font-size: 9.5px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: var(--tag-background);
+      color: var(--tag-color);
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Left Ribbon
+     ════════════════════════════════════════════════════════════════════════ */
+    .ribbon {
+      width: 44px;
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--panel-border-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 0;
+      gap: 1px;
+    }
+
+    .ribbon-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-s);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--icon-color);
+      opacity: var(--icon-opacity);
+      transition: all 0.1s;
+      position: relative;
+    }
+
+    .ribbon-btn:hover {
+      color: var(--icon-color-hover);
+      opacity: 1;
+      background: var(--bg-modifier-hover);
+    }
+
+    .ribbon-btn.active {
+      color: var(--nav-item-color-active);
+      opacity: 1;
+      background: var(--nav-item-background-active);
+    }
+
+    .ribbon-btn.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 7px;
+      bottom: 7px;
+      width: 2px;
+      border-radius: 1px;
+      background: var(--interactive-accent);
+    }
+
+    .ribbon-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .ribbon-spacer {
+      flex: 1;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Main Content
+     ════════════════════════════════════════════════════════════════════════ */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* Breadcrumb */
+    .breadcrumb {
+      height: 28px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 4px;
+      border-bottom: 1px solid var(--panel-border-color);
+      background: var(--bg-primary);
+      font-size: 12px;
+    }
+
+    .breadcrumb a {
+      color: var(--text-faint);
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.1s;
+    }
+
+    .breadcrumb a:hover {
+      color: var(--link-color);
+    }
+
+    .breadcrumb .sep {
+      color: var(--text-faint);
+      font-size: 10px;
+      opacity: 0.5;
+    }
+
+    .breadcrumb .current {
+      color: var(--text-normal);
+      font-weight: 500;
+    }
+
+    .breadcrumb .spacer {
+      flex: 1;
+    }
+
+    .breadcrumb-actions {
+      display: flex;
+      gap: 4px;
+      -webkit-app-region: no-drag;
+    }
+
+    .breadcrumb-btn {
+      padding: 2px 8px;
+      border-radius: var(--radius-s);
+      font-size: 11px;
+      cursor: pointer;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid var(--bg-modifier-border);
+      transition: all 0.1s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .breadcrumb-btn:hover {
+      background: var(--bg-modifier-hover);
+      color: var(--text-normal);
+      border-color: var(--bg-modifier-border-hover);
+    }
+
+    .breadcrumb-btn.accent {
+      background: var(--interactive-accent);
+      color: var(--text-on-accent);
+      border-color: var(--interactive-accent);
+    }
+
+    .breadcrumb-btn.accent:hover {
+      background: var(--interactive-accent-hover);
+    }
+
+    /* Tab Bar */
+    .tab-bar {
+      height: 36px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-end;
+      padding: 0 4px;
+      background: var(--bg-primary);
+      border-bottom: 1px solid var(--panel-border-color);
+    }
+
+    .tab-item {
+      height: 34px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      color: var(--tab-text-color);
+      cursor: pointer;
+      transition: all 0.1s;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      position: relative;
+    }
+
+    .tab-item:hover {
+      color: var(--tab-text-color-focused);
+      background: var(--bg-modifier-hover);
+    }
+
+    .tab-item.active {
+      color: var(--tab-text-color-focused-active);
+      background: var(--tab-background-active);
+      border-bottom-color: var(--interactive-accent);
+    }
+
+    .tab-item svg {
+      width: 14px;
+      height: 14px;
+      color: var(--icon-color);
+    }
+
+    .tab-item.active svg {
+      color: var(--text-accent);
+    }
+
+    .tab-badge {
+      font-size: 9px;
+      padding: 0px 5px;
+      border-radius: 8px;
+      background: var(--bg-modifier-hover);
+      color: var(--text-faint);
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .tab-item.active .tab-badge {
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+    }
+
+    .tab-spacer {
+      flex: 1;
+    }
+
+    /* Content Panels */
+    .content-area {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .panel {
+      display: none;
+      height: 100%;
+    }
+
+    .panel.active {
+      display: flex;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Panel: README
+     ════════════════════════════════════════════════════════════════════════ */
+    .readme-panel {
+      display: none;
+    }
+
+    .readme-panel.active {
+      display: grid;
+      grid-template-columns: 1fr 250px;
+      height: 100%;
+    }
+
+    .readme-body {
+      overflow-y: auto;
+      padding: 24px 32px;
+      border-right: 1px solid var(--panel-border-color);
+    }
+
+    .readme-body::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .readme-body::-webkit-scrollbar-track {
+      background: var(--scrollbar-bg);
+    }
+
+    .readme-body::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .readme-body h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--panel-border-color);
+    }
+
+    .readme-body blockquote {
+      margin: 12px 0;
+      padding: 10px 14px;
+      border-left: 3px solid var(--interactive-accent);
+      background: var(--bg-modifier-accent);
+      border-radius: 0 var(--radius-s) var(--radius-s) 0;
+      color: var(--text-muted);
+      font-style: italic;
+      font-size: 13px;
+    }
+
+    .readme-body h2 {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 22px 0 8px;
+      color: var(--text-normal);
+    }
+
+    .readme-body ul {
+      padding-left: 22px;
+      color: var(--text-muted);
+      line-height: 1.85;
+      font-size: 13px;
+    }
+
+    .readme-body li strong {
+      color: var(--text-normal);
+    }
+
+    .readme-body p {
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      line-height: 1.75;
+      font-size: 13px;
+    }
+
+    .readme-body a {
+      color: var(--link-color);
+      text-decoration: none;
+    }
+
+    .readme-body a:hover {
+      color: var(--link-color-hover);
+      text-decoration: underline;
+    }
+
+    .readme-body pre {
+      margin: 10px 0;
+      padding: 14px 16px;
+      border-radius: var(--radius-m);
+      background: var(--bg-primary-alt);
+      border: 1px solid var(--panel-border-color);
+      font-family: var(--font-monospace-theme);
+      font-size: 12px;
+      line-height: 1.65;
+      color: var(--text-muted);
+      overflow-x: auto;
+    }
+
+    .readme-body code {
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 11.5px;
+      font-family: var(--font-monospace-theme);
+    }
+
+    /* Sidebar info cards */
+    .readme-sidebar {
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .readme-sidebar::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .readme-sidebar::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .info-card {
+      padding: 10px 12px;
+      border-radius: var(--radius-m);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--panel-border-color);
+    }
+
+    .info-card h3 {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      font-size: 11px;
+    }
+
+    .info-row .label {
+      color: var(--text-faint);
+    }
+
+    .info-row .value {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .info-row .value.accent {
+      color: var(--text-accent);
+    }
+
+    .info-tag {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+      display: inline-block;
+      margin: 2px 3px 2px 0;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .info-tag:hover {
+      background: rgba(100, 140, 255, 0.15);
+    }
+
+    .info-link {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px;
+      border-radius: var(--radius-s);
+      font-size: 11px;
+      color: var(--link-color);
+      cursor: pointer;
+      background: var(--bg-modifier-hover);
+      transition: background 0.1s;
+      text-decoration: none;
+      margin-bottom: 3px;
+    }
+
+    .info-link:hover {
+      background: var(--bg-modifier-accent);
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Panel: Notes & Code
+     ════════════════════════════════════════════════════════════════════════ */
+    .notes-panel {
+      display: none;
+    }
+
+    .notes-panel.active {
+      display: flex;
+      height: 100%;
+    }
+
+    /* Note list */
+    .note-list-panel {
+      width: 190px;
+      min-width: 150px;
+      max-width: 280px;
+      border-right: 1px solid var(--panel-border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .note-list-header {
+      height: 36px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--panel-border-color);
+    }
+
+    .note-list-header .label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .note-list-header .count {
+      font-weight: 400;
+    }
+
+    .note-add-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: var(--radius-s);
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      cursor: pointer;
+      border: 1px solid rgba(100, 140, 255, 0.12);
+      transition: all 0.1s;
+      line-height: 1;
+    }
+
+    .note-add-btn:hover {
+      background: rgba(100, 140, 255, 0.18);
+    }
+
+    .note-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2px 4px;
+    }
+
+    .note-list::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .note-list::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .note-item {
+      padding: 7px 8px;
+      border-radius: var(--radius-s);
+      cursor: pointer;
+      transition: background 0.08s;
+      border-left: 2px solid transparent;
+      margin-bottom: 1px;
+    }
+
+    .note-item:hover {
+      background: var(--bg-modifier-hover);
+    }
+
+    .note-item.active {
+      background: var(--nav-item-background-active);
+      border-left-color: var(--interactive-accent);
+    }
+
+    .note-item .note-title {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-normal);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .note-item.active .note-title {
+      color: var(--nav-item-color-active);
+    }
+
+    .note-item .note-date {
+      font-size: 9.5px;
+      color: var(--text-faint);
+      margin-top: 1px;
+    }
+
+    /* Divider */
+    .divider {
+      width: 1px;
+      flex-shrink: 0;
+      background: var(--panel-border-color);
+      cursor: col-resize;
+      position: relative;
+      z-index: 5;
+      transition: background 0.08s;
+    }
+
+    .divider::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -5px;
+      right: -5px;
+    }
+
+    .divider:hover,
+    .divider.dragging {
+      background: var(--interactive-accent);
+    }
+
+    /* Center panel */
+    .center-panel {
+      flex: 1;
+      min-width: 180px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sub-tab-bar {
+      height: 34px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      border-bottom: 1px solid var(--panel-border-color);
+      background: var(--bg-primary);
+    }
+
+    .sub-tab {
+      height: 32px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      color: var(--tab-text-color);
+      cursor: pointer;
+      transition: all 0.1s;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+
+    .sub-tab:hover {
+      color: var(--tab-text-color-focused);
+    }
+
+    .sub-tab.active {
+      color: var(--tab-text-color-focused-active);
+      border-bottom-color: var(--interactive-accent);
+    }
+
+    .sub-tab.disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .sub-tab .badge {
+      font-size: 9px;
+      padding: 0px 5px;
+      border-radius: 8px;
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+    }
+
+    .sub-tab-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-right: 4px;
+    }
+
+    .sub-tab-actions input {
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-normal);
+      width: 140px;
+      font-family: var(--font-interface-theme);
+    }
+
+    .sub-tab-actions input::placeholder {
+      color: var(--text-faint);
+    }
+
+    .save-btn {
+      padding: 3px 10px;
+      border-radius: var(--radius-s);
+      background: var(--interactive-accent);
+      color: var(--text-on-accent);
+      font-size: 10.5px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.1s;
+    }
+
+    .save-btn:hover {
+      background: var(--interactive-accent-hover);
+    }
+
+    .file-info {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10.5px;
+      color: var(--text-faint);
+      font-family: var(--font-monospace-theme);
+    }
+
+    .file-info .path {
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Editor */
+    .editor-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .editor-pane {
+      flex: 1;
+      padding: 10px 12px;
+      overflow-y: auto;
+      font-family: var(--font-monospace-theme);
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    .editor-pane::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .editor-pane::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .editor-pane .ln {
+      color: var(--text-faint);
+      display: inline-block;
+      width: 22px;
+      text-align: right;
+      margin-right: 12px;
+      user-select: none;
+      font-size: 10px;
+    }
+
+    .editor-pane .h {
+      color: #bb9af7;
+      font-weight: 600;
+    }
+
+    .editor-pane .b {
+      color: var(--text-normal);
+      font-weight: 600;
+    }
+
+    .editor-pane .c {
+      color: #9ece6a;
+      background: rgba(158, 206, 106, 0.1);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .editor-pane .l {
+      color: var(--text-muted);
+    }
+
+    .editor-pane .t {
+      color: var(--text-faint);
+    }
+
+    .editor-pane .a {
+      color: var(--text-accent);
+    }
+
+    .ed-divider {
+      width: 1px;
+      background: var(--panel-border-color);
+    }
+
+    .preview-pane {
+      flex: 1;
+      padding: 10px 12px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.75;
+    }
+
+    .preview-pane::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .preview-pane::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .preview-pane h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-normal);
+      margin-bottom: 5px;
+    }
+
+    .preview-pane h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .preview-pane p {
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    .preview-pane code {
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-family: var(--font-monospace-theme);
+    }
+
+    .preview-pane a {
+      color: var(--link-color);
+    }
+
+    .preview-pane ul {
+      padding-left: 18px;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    .preview-pane li {
+      margin-bottom: 2px;
+    }
+
+    .preview-pane pre {
+      background: var(--bg-primary-alt);
+      border: 1px solid var(--panel-border-color);
+      border-radius: var(--radius-s);
+      padding: 8px 10px;
+      font-family: var(--font-monospace-theme);
+      font-size: 11px;
+      line-height: 1.6;
+      margin-top: 5px;
+      color: var(--text-muted);
+    }
+
+    /* Code viewer */
+    .code-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .code-header {
+      height: 28px;
+      flex-shrink: 0;
+      padding: 0 14px;
+      font-size: 10.5px;
+      color: var(--text-faint);
+      border-bottom: 1px solid var(--panel-border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-secondary);
+    }
+
+    .code-header .lang-badge {
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+    }
+
+    .code-scroll {
+      flex: 1;
+      overflow-y: auto;
+      font-family: var(--font-monospace-theme);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .code-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .code-scroll::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .code-line {
+      display: flex;
+      padding: 0 14px;
+      transition: background 0.06s;
+    }
+
+    .code-line:hover {
+      background: rgba(255, 255, 255, 0.012);
+    }
+
+    .code-line .n {
+      width: 22px;
+      text-align: right;
+      color: var(--text-faint);
+      margin-right: 12px;
+      user-select: none;
+      flex-shrink: 0;
+      font-size: 10px;
+    }
+
+    .code-line .kw {
+      color: #bb9af7;
+    }
+
+    .code-line .fn {
+      color: #7aa2f7;
+    }
+
+    .code-line .st {
+      color: #9ece6a;
+    }
+
+    .code-line .cm {
+      color: #565f89;
+      font-style: italic;
+    }
+
+    .code-line .nu {
+      color: #ff9e64;
+    }
+
+    .code-line .ty {
+      color: #e0af68;
+    }
+
+    .code-line .df {
+      color: var(--text-normal);
+    }
+
+    .code-line .pr {
+      color: #ff9e64;
+    }
+
+    /* File tree */
+    .file-tree-panel {
+      width: 210px;
+      min-width: 150px;
+      max-width: 340px;
+      border-left: 1px solid var(--panel-border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 0.15s ease, opacity 0.12s ease;
+    }
+
+    .file-tree-panel.collapsed {
+      width: 0;
+      min-width: 0;
+      overflow: hidden;
+      opacity: 0;
+      border-left-color: transparent;
+    }
+
+    .ft-header {
+      height: 36px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--panel-border-color);
+    }
+
+    .ft-header .label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .ft-header .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .ft-header .dot.on {
+      background: #9ece6a;
+      box-shadow: 0 0 5px rgba(158, 206, 106, 0.3);
+    }
+
+    .ft-header .dot.off {
+      background: #e0af68;
+    }
+
+    .ft-actions {
+      display: flex;
+      gap: 1px;
+    }
+
+    .ft-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: var(--radius-s);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--icon-color);
+      opacity: var(--icon-opacity);
+      transition: all 0.1s;
+      font-size: 12px;
+    }
+
+    .ft-btn:hover {
+      background: var(--bg-modifier-hover);
+      color: var(--icon-color-hover);
+      opacity: 1;
+    }
+
+    .ft-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2px 0;
+    }
+
+    .ft-list::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .ft-list::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      padding: 3px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.08s;
+    }
+
+    .tree-item:hover {
+      background: var(--bg-modifier-hover);
+    }
+
+    .tree-item.active {
+      background: var(--nav-item-background-active);
+    }
+
+    .tree-item .indent {
+      display: inline-block;
+      width: 14px;
+    }
+
+    .tree-item .icon {
+      width: 16px;
+      margin-right: 4px;
+      text-align: center;
+      font-size: 10px;
+    }
+
+    .tree-item .name {
+      color: var(--text-normal);
+    }
+
+    .ft-hint {
+      padding: 5px 10px;
+      border-top: 1px solid var(--panel-border-color);
+      font-size: 9px;
+      color: var(--text-faint);
+      text-align: center;
+    }
+
+    .tree-toggle-btn {
+      width: 22px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-left: 1px solid var(--panel-border-color);
+      background: var(--bg-primary);
+      cursor: pointer;
+      transition: all 0.1s;
+      color: var(--icon-color);
+      opacity: var(--icon-opacity);
+      font-size: 11px;
+    }
+
+    .tree-toggle-btn:hover {
+      background: var(--bg-modifier-hover);
+      color: var(--icon-color-hover);
+      opacity: 1;
+    }
+
+    .tree-toggle-btn.hidden {
+      display: none;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Panel: Activity
+     ════════════════════════════════════════════════════════════════════════ */
+    .activity-panel {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .activity-panel.active {
+      display: flex;
+    }
+
+    .act-filters {
+      display: flex;
+      gap: 5px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--panel-border-color);
+      flex-shrink: 0;
+    }
+
+    .act-filter {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.1s;
+      background: var(--bg-tertiary);
+      color: var(--text-faint);
+      border: 1px solid var(--panel-border-color);
+    }
+
+    .act-filter.active {
+      background: var(--interactive-accent);
+      color: var(--text-on-accent);
+      border-color: var(--interactive-accent);
+    }
+
+    .act-filter:hover:not(.active) {
+      background: var(--bg-modifier-hover);
+      color: var(--text-muted);
+    }
+
+    .act-timeline {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+    }
+
+    .act-timeline::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .act-timeline::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .act-group-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-faint);
+      padding: 2px 8px;
+      border-radius: var(--radius-s);
+      background: var(--bg-tertiary);
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    .act-group {
+      margin-bottom: 14px;
+    }
+
+    .act-line {
+      border-left: 2px solid var(--panel-border-color);
+      margin-left: 6px;
+      padding-left: 14px;
+    }
+
+    .act-card {
+      padding: 8px 10px;
+      border-radius: var(--radius-m);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--panel-border-color);
+      margin-bottom: 5px;
+      position: relative;
+      transition: border-color 0.1s;
+    }
+
+    .act-card:hover {
+      border-color: var(--bg-modifier-border-hover);
+    }
+
+    .act-card::before {
+      content: '';
+      position: absolute;
+      left: -19px;
+      top: 12px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--bg-tertiary);
+      border: 2px solid var(--panel-border-color);
+    }
+
+    .act-card .ac-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+    }
+
+    .act-card .ac-left {
+      display: flex;
+      align-items: start;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .act-card .ac-icon {
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .act-card .ac-title {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-normal);
+    }
+
+    .act-card .ac-desc {
+      font-size: 10px;
+      color: var(--text-faint);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 460px;
+    }
+
+    .act-card .ac-time {
+      font-size: 10px;
+      color: var(--text-faint);
+      flex-shrink: 0;
+      margin-left: 10px;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Panel: Health
+     ════════════════════════════════════════════════════════════════════════ */
+    .health-panel {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .health-panel.active {
+      display: flex;
+    }
+
+    .health-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+    }
+
+    .health-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .health-scroll::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb-bg);
+      border-radius: 3px;
+    }
+
+    .health-top {
+      display: grid;
+      grid-template-columns: 170px 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .score-card {
+      padding: 18px;
+      border-radius: var(--radius-m);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--panel-border-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .score-ring {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      margin-bottom: 8px;
+    }
+
+    .score-ring svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .score-ring .center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .score-ring .num {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .score-ring .lbl {
+      font-size: 9px;
+      color: var(--text-faint);
+    }
+
+    .score-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+
+    .metrics-card {
+      padding: 14px;
+      border-radius: var(--radius-m);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--panel-border-color);
+    }
+
+    .metrics-card h3 {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .metric-row {
+      margin-bottom: 8px;
+    }
+
+    .metric-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .metric-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3px;
+      font-size: 10px;
+    }
+
+    .metric-label .name {
+      color: var(--text-faint);
+    }
+
+    .metric-label .val {
+      font-weight: 600;
+    }
+
+    .metric-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: var(--bg-modifier-hover);
+      overflow: hidden;
+    }
+
+    .metric-bar .fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+
+    .health-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .health-card {
+      padding: 14px;
+      border-radius: var(--radius-m);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--panel-border-color);
+    }
+
+    .health-card h3 {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .stat-box {
+      text-align: center;
+      padding: 8px;
+      border-radius: var(--radius-s);
+      background: var(--bg-modifier-hover);
+    }
+
+    .stat-box .num {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .stat-box .lbl {
+      font-size: 9px;
+      color: var(--text-faint);
+      margin-top: 2px;
+    }
+
+    .contrib-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 7px;
+      border-radius: var(--radius-s);
+      font-size: 11px;
+      background: var(--bg-modifier-hover);
+      margin-bottom: 3px;
+    }
+
+    .contrib-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--bg-modifier-accent);
+      color: var(--text-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .contrib-name {
+      flex: 1;
+      color: var(--text-normal);
+    }
+
+    .contrib-commits {
+      color: var(--text-faint);
+      font-size: 10px;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Status Bar
+     ════════════════════════════════════════════════════════════════════════ */
+    .statusbar {
+      height: 24px;
+      flex-shrink: 0;
+      background: var(--status-bar-background);
+      border-top: 1px solid var(--panel-border-color);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 11px;
+      color: var(--text-faint);
+      gap: 16px;
+    }
+
+    .statusbar .status-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .statusbar .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #9ece6a;
+    }
+
+    .statusbar .spacer {
+      flex: 1;
+    }
+
+    /* ════════════════════════════════════════════════════════════════════════
+     Toast
+     ════════════════════════════════════════════════════════════════════════ */
+    .toast {
+      position: fixed;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%) translateY(6px);
+      padding: 6px 14px;
+      border-radius: var(--radius-m);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--panel-border-color);
+      color: var(--text-normal);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      opacity: 0;
+      transition: all 0.2s ease;
+      pointer-events: none;
+      z-index: 100;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast .toast-icon {
+      color: #9ece6a;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app">
+    <!-- ═══ Title Bar ═══ -->
+    <div class="titlebar">
+      <div class="titlebar-drag">
+        <span class="titlebar-text">⭐ StarNest — vuejs/core — Obsidian v1.8.10</span>
+      </div>
+      <div class="titlebar-buttons">
+        <div class="titlebar-btn" title="最小化"><svg viewBox="0 0 16 16" fill="currentColor">
+            <rect y="13" width="10" height="1.5" rx="0.5" />
+          </svg></div>
+        <div class="titlebar-btn" title="最大化"><svg viewBox="0 0 16 16" fill="currentColor">
+            <rect x="2" y="2" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.2" />
+          </svg></div>
+        <div class="titlebar-btn" title="关闭"><svg viewBox="0 0 16 16" fill="currentColor">
+            <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg></div>
+      </div>
+    </div>
+
+    <div class="app-body">
+      <!-- ═══ Left Ribbon ═══ -->
+      <div class="ribbon">
+        <div class="ribbon-btn" title="文件浏览器" onclick="showToast('文件浏览器')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+          </svg>
+        </div>
+        <div class="ribbon-btn" title="搜索" onclick="showToast('搜索')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+        </div>
+        <div class="ribbon-btn active" title="StarNest" onclick="showToast('StarNest')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+        </div>
+        <div class="ribbon-btn" title="图谱" onclick="showToast('关系图谱')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="18" r="3" />
+            <circle cx="6" cy="6" r="3" />
+            <path d="M13 6h3a2 2 0 012 2v7" />
+            <path d="M6 9v12" />
+          </svg>
+        </div>
+        <div class="ribbon-spacer"></div>
+        <div class="ribbon-btn" title="设置" onclick="showToast('设置')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001 1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- ═══ Left Sidebar ═══ -->
+      <div class="sidebar-left" id="sidebarLeft">
+        <div class="sidebar-header">
+          <!-- 用户信息区域 -->
+          <div class="user-container" onclick="showUserMenu()">
+            <img class="user-avatar" src="https://avatars.githubusercontent.com/u/499550?v=4" alt="yyx990803" />
+            <div class="user-info">
+              <span class="user-name">Evan You</span>
+              <span class="user-count">48 个仓库</span>
+            </div>
+            <div class="user-dropdown-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </div>
+          </div>
+          <!-- 操作按钮 -->
+          <div class="sidebar-header-actions">
+            <div class="sidebar-header-btn" title="同步" onclick="showToast('正在同步...')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M21 2v6h-6" />
+                <path d="M3 12a9 9 0 0115-6.7L21 9" />
+              </svg>
+            </div>
+            <div class="sidebar-header-btn" title="排序">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m3 16 4 4 4-4" />
+                <path d="M7 12h4" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-search">
+          <div class="search-input-container">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input class="search-input" type="text" placeholder="搜索仓库..." id="searchInput" oninput="filterRepos()" />
+          </div>
+        </div>
+
+        <div class="sidebar-filters">
+          <span class="filter-pill active" onclick="setFilter(this)">全部</span>
+          <span class="filter-pill" onclick="setFilter(this)">前端</span>
+          <span class="filter-pill" onclick="setFilter(this)">Rust</span>
+          <span class="filter-pill" onclick="setFilter(this)">AI/ML</span>
+          <span class="filter-pill" onclick="setFilter(this)">工具链</span>
+        </div>
+
+        <div class="repo-list" id="repoList">
+          <div class="repo-item active" onclick="selectRepo(this, 'vuejs/core')">
+            <div class="repo-item-header">
+              <div class="repo-item-avatar" style="background:linear-gradient(135deg,#7aa2f7,#bb9af7);">V</div>
+              <span class="repo-item-name">vuejs/core</span>
+              <span class="repo-item-lang" style="background:#3178c6;"></span>
+            </div>
+            <div class="repo-item-desc">渐进式 JavaScript 框架，用于构建现代 Web 应用</div>
+            <div class="repo-item-meta"><span>⭐ 208.9k</span><span>🍴 34.2k</span><span>3h</span></div>
+            <div class="repo-item-tags"><span class="repo-item-tag">前端框架</span><span
+                class="repo-item-tag">TypeScript</span></div>
+          </div>
+          <div class="repo-item" onclick="selectRepo(this, 'tauri-apps/tauri')">
+            <div class="repo-item-header">
+              <div class="repo-item-avatar" style="background:linear-gradient(135deg,#ff9e64,#f7768e);">T</div>
+              <span class="repo-item-name">tauri-apps/tauri</span>
+              <span class="repo-item-lang" style="background:#dea584;"></span>
+            </div>
+            <div class="repo-item-desc">使用 Web 技术构建更小、更快、更安全的桌面和移动应用</div>
+            <div class="repo-item-meta"><span>⭐ 89.2k</span><span>🍴 2.8k</span><span>1d</span></div>
+            <div class="repo-item-tags"><span class="repo-item-tag">桌面应用</span><span class="repo-item-tag">Rust</span>
+            </div>
+          </div>
+          <div class="repo-item" onclick="selectRepo(this, 'denoland/deno')">
+            <div class="repo-item-header">
+              <div class="repo-item-avatar" style="background:linear-gradient(135deg,#9ece6a,#7aa2f7);">D</div>
+              <span class="repo-item-name">denoland/deno</span>
+              <span class="repo-item-lang" style="background:#dea584;"></span>
+            </div>
+            <div class="repo-item-desc">A modern runtime for JavaScript and TypeScript</div>
+            <div class="repo-item-meta"><span>⭐ 98.5k</span><span>🍴 5.4k</span><span>5h</span></div>
+            <div class="repo-item-tags"><span class="repo-item-tag">运行时</span></div>
+          </div>
+          <div class="repo-item" onclick="selectRepo(this, 'shadcn-ui/ui')">
+            <div class="repo-item-header">
+              <div class="repo-item-avatar" style="background:linear-gradient(135deg,#1a1a2e,#e94560);">S</div>
+              <span class="repo-item-name">shadcn-ui/ui</span>
+              <span class="repo-item-lang" style="background:#3178c6;"></span>
+            </div>
+            <div class="repo-item-desc">Beautifully designed components built with Radix and Tailwind CSS</div>
+            <div class="repo-item-meta"><span>⭐ 79.1k</span><span>🍴 5.1k</span><span>12h</span></div>
+            <div class="repo-item-tags"><span class="repo-item-tag">UI组件</span><span class="repo-item-tag">React</span>
+            </div>
+          </div>
+          <div class="repo-item" onclick="selectRepo(this, 'tokio-rs/tokio')">
+            <div class="repo-item-header">
+              <div class="repo-item-avatar" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);">T</div>
+              <span class="repo-item-name">tokio-rs/tokio</span>
+              <span class="repo-item-lang" style="background:#dea584;"></span>
+            </div>
+            <div class="repo-item-desc">A runtime for writing reliable asynchronous applications with Rust</div>
+            <div class="repo-item-meta"><span>⭐ 26.8k</span><span>🍴 2.5k</span><span>2d</span></div>
+            <div class="repo-item-tags"><span class="repo-item-tag">异步</span><span class="repo-item-tag">Rust</span>
+            </div>
+          </div>
+          <div class="repo-item" onclick="selectRepo(this, 'vercel/next.js')">
+            <div class="repo-item-header">
+              <div class="repo-item-avatar" style="background:linear-gradient(135deg,#0f0f0f,#444);">N</div>
+              <span class="repo-item-name">vercel/next.js</span>
+              <span class="repo-item-lang" style="background:#3178c6;"></span>
+            </div>
+            <div class="repo-item-desc">The React Framework for the Web</div>
+            <div class="repo-item-meta"><span>⭐ 130k</span><span>🍴 28.1k</span><span>30m</span></div>
+            <div class="repo-item-tags"><span class="repo-item-tag">前端框架</span><span class="repo-item-tag">React</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Main Content ═══ -->
+      <div class="main-content">
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+          <a onclick="showToast('返回')">Stars</a>
+          <span class="sep">›</span>
+          <span class="current" id="breadcrumbRepo">vuejs/core</span>
+          <span class="spacer"></span>
+          <div class="breadcrumb-actions">
+            <div class="breadcrumb-btn" onclick="showToast('已复制 Clone URL')">📋 Clone</div>
+            <div class="breadcrumb-btn" onclick="showToast('正在打开...')">↗</div>
+            <div class="breadcrumb-btn accent" onclick="toggleStarBtn(this)">⭐ 已星标</div>
+          </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tab-bar">
+          <div class="tab-item active" data-tab="readme" onclick="switchTab('readme')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M2 3h6a4 4 0 014 4v14a4 4 0 01-4 4H2" />
+              <path d="M14 2v6H6" />
+              <path d="M16 13H8" />
+              <path d="M16 17H8" />
+            </svg>
+            README
+          </div>
+          <div class="tab-item" data-tab="notes" onclick="switchTab('notes')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12l4-4V7.5L16.5 2z" />
+              <path d="M14 2l6 6" />
+              <path d="M16 13H8" />
+              <path d="M16 17H8" />
+            </svg>
+            笔记 & 代码 <span class="tab-badge">5</span>
+          </div>
+          <div class="tab-item" data-tab="activity" onclick="switchTab('activity')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+            动态 <span class="tab-badge">9</span>
+          </div>
+          <div class="tab-item" data-tab="health" onclick="switchTab('health')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+            健康度
+          </div>
+          <div class="tab-spacer"></div>
+        </div>
+
+        <!-- Content -->
+        <div class="content-area">
+          <!-- ═══ README ═══ -->
+          <div class="readme-panel active" id="panelReadme">
+            <div class="readme-body">
+              <h1>vuejs/core</h1>
+              <blockquote>渐进式 JavaScript 框架，用于构建现代 Web 应用。简洁的 API、优秀的性能和丰富的生态系统。</blockquote>
+              <h2>特性</h2>
+              <ul>
+                <li><strong>渐进式框架</strong>：可以根据需求逐步引入</li>
+                <li><strong>Composition API</strong>：更灵活的代码组织方式</li>
+                <li><strong>性能卓越</strong>：基于 Proxy 的响应式系统</li>
+                <li><strong>TypeScript 支持</strong>：提供完整的类型定义</li>
+                <li><strong>丰富的生态</strong>：Router、Pinia、Vite 等官方工具</li>
+              </ul>
+              <h2>快速开始</h2>
+              <pre><span style="color:#9ece6a;">$ </span>npm create vue@latest</pre>
+              <h2>文档</h2>
+              <p>完整文档请访问 <a href="#">官方网站</a>。</p>
+              <h2>贡献</h2>
+              <p>欢迎贡献代码！请阅读 <a href="#">贡献指南</a> 了解详情。</p>
+            </div>
+            <div class="readme-sidebar">
+              <div class="info-card">
+                <h3>Topics</h3>
+                <div><span class="info-tag">javascript</span><span class="info-tag">framework</span><span
+                    class="info-tag">frontend</span><span class="info-tag">vue</span><span
+                    class="info-tag">typescript</span><span class="info-tag">reactive</span></div>
+              </div>
+              <div class="info-card">
+                <h3>仓库信息</h3>
+                <div class="info-row"><span class="label">创建时间</span><span class="value">2014-02-25</span></div>
+                <div class="info-row"><span class="label">最后推送</span><span class="value">3 小时前</span></div>
+                <div class="info-row"><span class="label">默认分支</span><span class="value">main</span></div>
+                <div class="info-row"><span class="label">包大小</span><span class="value">33.8 kB gzip</span></div>
+                <div class="info-row"><span class="label">许可证</span><span class="value">MIT</span></div>
+                <div class="info-row"><span class="label">版本</span><span class="value accent">v3.5.0</span></div>
+              </div>
+              <div class="info-card">
+                <h3>快捷链接</h3>
+                <a class="info-link">🌐 vuejs.org</a>
+                <a class="info-link" onclick="showToast('已复制 Clone URL')">📋 复制 Clone URL</a>
+                <a class="info-link" onclick="showToast('开始下载...')">📂 下载 ZIP</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ Notes & Code ═══ -->
+          <div class="notes-panel" id="panelNotes">
+            <div class="note-list-panel" id="nlPanel">
+              <div class="note-list-header"><span class="label">📝 笔记 <span class="count">(5)</span></span>
+                <div class="note-add-btn" onclick="addNote()">+</div>
+              </div>
+              <div class="note-list">
+                <div class="note-item active" onclick="selectNote(this,'响应式系统核心原理')">
+                  <div class="note-title">响应式系统核心原理</div>
+                  <div class="note-date">2025-04-28</div>
+                </div>
+                <div class="note-item" onclick="selectNote(this,'Composition API 最佳实践')">
+                  <div class="note-title">Composition API 最佳实践</div>
+                  <div class="note-date">2025-04-25</div>
+                </div>
+                <div class="note-item" onclick="selectNote(this,'虚拟 DOM diff 算法')">
+                  <div class="note-title">虚拟 DOM diff 算法</div>
+                  <div class="note-date">2025-04-20</div>
+                </div>
+                <div class="note-item" onclick="selectNote(this,'编译器优化策略')">
+                  <div class="note-title">编译器优化策略</div>
+                  <div class="note-date">2025-04-15</div>
+                </div>
+                <div class="note-item" onclick="selectNote(this,'SFC 单文件组件设计')">
+                  <div class="note-title">SFC 单文件组件设计</div>
+                  <div class="note-date">2025-04-10</div>
+                </div>
+              </div>
+            </div>
+            <div class="divider" id="divL"></div>
+            <div class="center-panel">
+              <div class="sub-tab-bar">
+                <div class="sub-tab active" id="stEditor" onclick="switchSub('editor')"><span>📝</span> 笔记编辑器</div>
+                <div class="sub-tab" id="stCode" onclick="switchSub('code')"><span>💻</span> 代码查看器 <span
+                    class="badge hidden" id="codeBadge"></span></div>
+                <div class="sub-tab-actions" id="subEditorActions"><input type="text" value="响应式系统核心原理"
+                    placeholder="Note Title" /><button class="save-btn">Save</button></div>
+                <div class="sub-tab-actions hidden" id="subCodeActions">
+                  <div class="file-info"><span>📄</span><span class="path"
+                      id="codePath">packages/reactivity/ref.ts</span></div>
+                </div>
+              </div>
+              <div class="editor-body" id="bodyEditor">
+                <div class="editor-pane">
+                  <div><span class="ln">1</span><span class="h">## 响应式系统核心原理</span></div>
+                  <div><span class="ln">2</span></div>
+                  <div><span class="ln">3</span><span class="t">Vue 3 的响应式系统基于 </span><span class="c">Proxy</span><span
+                      class="t"> 实现。</span></div>
+                  <div><span class="ln">4</span><span class="t">核心流程：</span></div>
+                  <div><span class="ln">5</span></div>
+                  <div><span class="ln">6</span><span class="l">- </span><span class="b">track()</span><span class="t">
+                      — 收集依赖</span></div>
+                  <div><span class="ln">7</span><span class="l">- </span><span class="b">trigger()</span><span
+                      class="t"> — 触发更新</span></div>
+                  <div><span class="ln">8</span><span class="l">- </span><span class="b">effect()</span><span class="t">
+                      — 副作用注册</span></div>
+                  <div><span class="ln">9</span></div>
+                  <div><span class="ln">10</span><span class="t">参考源码：</span><span
+                      class="a">[reactivity/src/reactive.ts]</span></div>
+                  <div><span class="ln">11</span></div>
+                  <div><span class="ln">12</span><span class="h">### 关键代码片段</span></div>
+                  <div><span class="ln">13</span><span class="c">```ts</span></div>
+                  <div><span class="ln">14</span><span class="c">const handler = {</span></div>
+                  <div><span class="ln">15</span><span class="c"> get(target, key) {</span></div>
+                  <div><span class="ln">16</span><span class="c"> track(target, key)</span></div>
+                  <div><span class="ln">17</span><span class="c"> return Reflect.get(...)</span></div>
+                  <div><span class="ln">18</span><span class="c"> }</span></div>
+                  <div><span class="ln">19</span><span class="c">}</span></div>
+                </div>
+                <div class="ed-divider"></div>
+                <div class="preview-pane">
+                  <h2>响应式系统核心原理</h2>
+                  <p>Vue 3 的响应式系统基于 <code>Proxy</code> 实现。核心流程：</p>
+                  <ul>
+                    <li><strong>track()</strong> — 收集依赖</li>
+                    <li><strong>trigger()</strong> — 触发更新</li>
+                    <li><strong>effect()</strong> — 副作用注册</li>
+                  </ul>
+                  <p>参考源码：<a href="#">reactivity/src/reactive.ts</a></p>
+                  <h3>关键代码片段</h3>
+                  <pre>const handler = {\n  get(target, key) {\n    track(target, key)\n    return Reflect.get(...)\n  }\n}</pre>
+                </div>
+              </div>
+              <div class="code-body hidden" id="bodyCode">
+                <div class="code-header">
+                  <div style="display:flex;align-items:center;gap:6px;"><span>📄</span><span id="codeHdrPath"
+                      style="font-family:var(--font-monospace-theme);">packages/reactivity/ref.ts</span></div>
+                  <div style="display:flex;align-items:center;gap:8px;"><span class="lang-badge">TypeScript</span><span
+                      style="font-size:10px;color:var(--text-faint);">30 lines</span></div>
+                </div>
+                <div class="code-scroll" id="codeScroll">
+                  <div class="code-line"><span class="n">1</span><span class="kw">import</span> <span class="df">{
+                      track, trigger }</span></div>
+                  <div class="code-line"><span class="n">2</span><span class="kw">import</span> <span class="df">{
+                      reactive }</span> <span class="kw">from</span> <span class="st">'./reactive'</span></div>
+                  <div class="code-line"><span class="n">3</span></div>
+                  <div class="code-line"><span class="n">4</span><span class="kw">export interface</span> <span
+                      class="ty">Ref</span>&lt;<span class="ty">T</span>&gt; { <span class="pr">value</span>: <span
+                      class="ty">T</span> }</div>
+                  <div class="code-line"><span class="n">5</span></div>
+                  <div class="code-line"><span class="n">6</span><span class="kw">export function</span> <span
+                      class="fn">ref</span>&lt;<span class="ty">T</span>&gt;(<span class="df">value</span>: <span
+                      class="ty">T</span>): <span class="ty">Ref</span>&lt;<span class="ty">T</span>&gt; {</div>
+                  <div class="code-line"><span class="n">7</span> <span class="kw">return</span> <span
+                      class="fn">createRef</span>(value, <span class="nu">false</span>)</div>
+                  <div class="code-line"><span class="n">8</span>}</div>
+                  <div class="code-line"><span class="n">9</span></div>
+                  <div class="code-line"><span class="n">10</span><span class="kw">function</span> <span
+                      class="fn">createRef</span>&lt;<span class="ty">T</span>&gt;(</div>
+                  <div class="code-line"><span class="n">11</span> <span class="df">rawValue</span>: <span
+                      class="ty">T</span>, <span class="df">shallow</span>: <span class="ty">boolean</span></div>
+                  <div class="code-line"><span class="n">12</span>): <span class="ty">Ref</span>&lt;<span
+                      class="ty">T</span>&gt; {</div>
+                  <div class="code-line"><span class="n">13</span> <span class="kw">const</span> r = {</div>
+                  <div class="code-line"><span class="n">14</span> <span class="fn">get value</span>() { <span
+                      class="fn">track</span>(r, <span class="st">'value'</span>) <span class="kw">return</span> shallow
+                    ? rawValue : r.<span class="pr">_value</span> },</div>
+                  <div class="code-line"><span class="n">15</span> <span class="fn">set value</span>(<span
+                      class="df">newVal</span>) {</div>
+                  <div class="code-line"><span class="n">16</span> <span class="kw">if</span> (hasChanged(newVal,
+                    r.<span class="pr">_value</span>)) { r.<span class="pr">_rawValue</span> = newVal; r.<span
+                      class="pr">_value</span> = newVal; <span class="fn">trigger</span>(r, <span
+                      class="st">'value'</span>) }</div>
+                  <div class="code-line"><span class="n">17</span> }</div>
+                  <div class="code-line"><span class="n">18</span> }</div>
+                  <div class="code-line"><span class="n">19</span> <span class="kw">return</span> r</div>
+                  <div class="code-line"><span class="n">20</span>}</div>
+                </div>
+              </div>
+            </div>
+            <div class="divider" id="divR"></div>
+            <div class="file-tree-panel" id="panelTree">
+              <div class="ft-header"><span class="label"><span class="dot on" id="statusDot"></span> 文件结构</span>
+                <div class="ft-actions"><span class="ft-btn" id="btnPull" onclick="showToast('已拉取最新代码')">🔄</span><span
+                    class="ft-btn" onclick="toggleTree()">»</span></div>
+              </div>
+              <div class="ft-list" id="ftContent">
+                <div class="tree-item"><span class="icon" style="color:var(--text-accent);">📂</span><span
+                    class="name">packages</span></div>
+                <div class="tree-item"><span class="indent"></span><span class="indent"></span><span class="icon"
+                    style="color:var(--text-accent);">📂</span><span class="name">reactivity</span></div>
+                <div class="tree-item"><span class="indent"></span><span class="indent"></span><span
+                    class="indent"></span><span class="icon" style="color:#3178c6;">TS</span><span
+                    class="name">index.ts</span></div>
+                <div class="tree-item"><span class="indent"></span><span class="indent"></span><span
+                    class="indent"></span><span class="icon" style="color:#3178c6;">TS</span><span
+                    class="name">reactive.ts</span></div>
+                <div class="tree-item active" onclick="clickFile(this,'ref.ts')"><span class="indent"></span><span
+                    class="indent"></span><span class="indent"></span><span class="icon"
+                    style="color:#3178c6;">TS</span><span class="name">ref.ts</span></div>
+                <div class="tree-item" onclick="clickFile(this,'effect.ts')"><span class="indent"></span><span
+                    class="indent"></span><span class="indent"></span><span class="icon"
+                    style="color:#3178c6;">TS</span><span class="name">effect.ts</span></div>
+                <div class="tree-item" onclick="clickFile(this,'computed.ts')"><span class="indent"></span><span
+                    class="indent"></span><span class="indent"></span><span class="icon"
+                    style="color:#3178c6;">TS</span><span class="name">computed.ts</span></div>
+                <div class="tree-item"><span class="indent"></span><span class="indent"></span><span class="icon"
+                    style="color:var(--text-accent);">📂</span><span class="name">runtime-core</span></div>
+                <div class="tree-item"><span class="icon" style="color:var(--text-accent);">📂</span><span
+                    class="name">src</span></div>
+                <div class="tree-item"><span class="indent"></span><span class="icon"
+                    style="color:#3178c6;">TS</span><span class="name">main.ts</span></div>
+                <div class="tree-item" onclick="clickFile(this,'App.vue')"><span class="indent"></span><span
+                    class="icon" style="color:#42b883;">V</span><span class="name">App.vue</span></div>
+                <div class="tree-item" onclick="clickFile(this,'README.md')"><span class="icon"
+                    style="color:var(--text-faint);">M</span><span class="name">README.md</span></div>
+                <div class="tree-item"><span class="icon" style="color:#e0af68;">J</span><span
+                    class="name">package.json</span></div>
+              </div>
+              <div class="ft-hint">点击文件自动切换到代码查看器</div>
+            </div>
+            <div class="tree-toggle-btn hidden" id="treeToggle" onclick="toggleTree()">«</div>
+          </div>
+
+          <!-- ═══ Activity ═══ -->
+          <div class="activity-panel" id="panelActivity">
+            <div class="act-filters">
+              <div class="act-filter active" onclick="filterAct(this)">全部</div>
+              <div class="act-filter" onclick="filterAct(this)">Release</div>
+              <div class="act-filter" onclick="filterAct(this)">Commit</div>
+              <div class="act-filter" onclick="filterAct(this)">笔记</div>
+            </div>
+            <div class="act-timeline">
+              <div class="act-group">
+                <div class="act-group-label">今天</div>
+                <div class="act-line">
+                  <div class="act-card">
+                    <div class="ac-top">
+                      <div class="ac-left"><span class="ac-icon">📦</span>
+                        <div>
+                          <div class="ac-title">发布 v3.5.0</div>
+                          <div class="ac-desc">新增响应式解构、useTemplateRef 等特性</div>
+                        </div>
+                      </div><span class="ac-time">14:30</span>
+                    </div>
+                  </div>
+                  <div class="act-card">
+                    <div class="ac-top">
+                      <div class="ac-left"><span class="ac-icon">📝</span>
+                        <div>
+                          <div class="ac-title">fix: 修复 Suspense 边界问题</div>
+                          <div class="ac-desc">fix(core): resolve Suspense boundary edge case</div>
+                        </div>
+                      </div><span class="ac-time">11:20</span>
+                    </div>
+                  </div>
+                  <div class="act-card">
+                    <div class="ac-top">
+                      <div class="ac-left"><span class="ac-icon">⭐</span>
+                        <div>
+                          <div class="ac-title">获得 128 个新 Star</div>
+                          <div class="ac-desc">本周 Star 增长 +2.3%</div>
+                        </div>
+                      </div><span class="ac-time">09:00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="act-group">
+                <div class="act-group-label">昨天</div>
+                <div class="act-line">
+                  <div class="act-card">
+                    <div class="ac-top">
+                      <div class="ac-left"><span class="ac-icon">📒</span>
+                        <div>
+                          <div class="ac-title">新增笔记：Composition API 学习笔记</div>
+                          <div class="ac-desc">这个框架的 Composition API 非常优雅...</div>
+                        </div>
+                      </div><span class="ac-time">20:15</span>
+                    </div>
+                  </div>
+                  <div class="act-card">
+                    <div class="ac-top">
+                      <div class="ac-left"><span class="ac-icon">📦</span>
+                        <div>
+                          <div class="ac-title">发布 v3.4.38</div>
+                          <div class="ac-desc">Bug 修复与性能改进</div>
+                        </div>
+                      </div><span class="ac-time">10:00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ Health ═══ -->
+          <div class="health-panel" id="panelHealth">
+            <div class="health-scroll">
+              <div class="health-top">
+                <div class="score-card">
+                  <div class="score-ring"><svg viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-modifier-hover)" stroke-width="7" />
+                      <circle cx="50" cy="50" r="42" fill="none" stroke="#9ece6a" stroke-width="7"
+                        stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="34" />
+                    </svg>
+                    <div class="center"><span class="num" style="color:#9ece6a;">87</span><span class="lbl">综合评分</span>
+                    </div>
+                  </div>
+                  <span class="score-badge" style="background:rgba(158,206,106,0.12);color:#9ece6a;">健康</span>
+                </div>
+                <div class="metrics-card">
+                  <h3>维度评分</h3>
+                  <div class="metric-row">
+                    <div class="metric-label"><span class="name">提交活跃度</span><span class="val"
+                        style="color:#9ece6a;">95%</span></div>
+                    <div class="metric-bar">
+                      <div class="fill" style="width:95%;background:#9ece6a;"></div>
+                    </div>
+                  </div>
+                  <div class="metric-row">
+                    <div class="metric-label"><span class="name">Issue 响应</span><span class="val"
+                        style="color:#9ece6a;">88%</span></div>
+                    <div class="metric-bar">
+                      <div class="fill" style="width:88%;background:#9ece6a;"></div>
+                    </div>
+                  </div>
+                  <div class="metric-row">
+                    <div class="metric-label"><span class="name">社区活跃度</span><span class="val"
+                        style="color:#9ece6a;">92%</span></div>
+                    <div class="metric-bar">
+                      <div class="fill" style="width:92%;background:#9ece6a;"></div>
+                    </div>
+                  </div>
+                  <div class="metric-row">
+                    <div class="metric-label"><span class="name">文档完整度</span><span class="val"
+                        style="color:var(--text-accent);">85%</span></div>
+                    <div class="metric-bar">
+                      <div class="fill" style="width:85%;background:var(--text-accent);"></div>
+                    </div>
+                  </div>
+                  <div class="metric-row">
+                    <div class="metric-label"><span class="name">测试覆盖率</span><span class="val"
+                        style="color:#e0af68;">78%</span></div>
+                    <div class="metric-bar">
+                      <div class="fill" style="width:78%;background:#e0af68;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="health-grid">
+                <div class="health-card">
+                  <h3>Issue 统计</h3>
+                  <div class="stat-grid">
+                    <div class="stat-box">
+                      <div class="num" style="color:#9ece6a;">156</div>
+                      <div class="lbl">待处理</div>
+                    </div>
+                    <div class="stat-box">
+                      <div class="num">522</div>
+                      <div class="lbl">已关闭</div>
+                    </div>
+                    <div class="stat-box">
+                      <div class="num" style="color:var(--text-accent);">3.2天</div>
+                      <div class="lbl">平均关闭</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="health-card">
+                  <h3>贡献者 Top 5</h3>
+                  <div class="contrib-row">
+                    <div class="contrib-avatar">Y</div><span class="contrib-name">yyx990803</span><span
+                      class="contrib-commits">4,821</span>
+                  </div>
+                  <div class="contrib-row">
+                    <div class="contrib-avatar">P</div><span class="contrib-name">pikax</span><span
+                      class="contrib-commits">1,203</span>
+                  </div>
+                  <div class="contrib-row">
+                    <div class="contrib-avatar">S</div><span class="contrib-name">sxzz</span><span
+                      class="contrib-commits">987</span>
+                  </div>
+                  <div class="contrib-row">
+                    <div class="contrib-avatar">O</div><span class="contrib-name">posva</span><span
+                      class="contrib-commits">654</span>
+                  </div>
+                  <div class="contrib-row">
+                    <div class="contrib-avatar">A</div><span class="contrib-name">antfu</span><span
+                      class="contrib-commits">432</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Status Bar ═══ -->
+    <div class="statusbar">
+      <div class="status-item"><span class="status-dot"></span> 已同步</div>
+      <div class="status-item">vuejs/core</div>
+      <div class="spacer"></div>
+      <div class="status-item">TypeScript</div>
+      <div class="status-item">⭐ 208.9k</div>
+      <div class="status-item">笔记 5</div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"><span class="toast-icon">✓</span><span id="toastText"></span></div>
+
+  <script>
+    // ── Tab Switching ──
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      document.getElementById('panelReadme').classList.toggle('active', tab === 'readme');
+      document.getElementById('panelNotes').classList.toggle('active', tab === 'notes');
+      document.getElementById('panelActivity').classList.toggle('active', tab === 'activity');
+      document.getElementById('panelHealth').classList.toggle('active', tab === 'health');
+    }
+
+    // ── Sub-tab ──
+    let currentSub = 'editor';
+    function switchSub(sub) {
+      currentSub = sub;
+      document.getElementById('stEditor').classList.toggle('active', sub === 'editor');
+      document.getElementById('stCode').classList.toggle('active', sub === 'code');
+      document.getElementById('bodyEditor').classList.toggle('hidden', sub !== 'editor');
+      document.getElementById('bodyCode').classList.toggle('hidden', sub !== 'code');
+      document.getElementById('subEditorActions').classList.toggle('hidden', sub !== 'editor');
+      document.getElementById('subCodeActions').classList.toggle('hidden', sub !== 'code');
+    }
+
+    // ── Notes ──
+    function selectNote(el, title) {
+      document.querySelectorAll('.note-item').forEach(n => n.classList.remove('active'));
+      el.classList.add('active');
+      document.querySelector('#subEditorActions input').value = title;
+      switchSub('editor');
+    }
+    function addNote() {
+      const list = document.querySelector('.note-list');
+      const item = document.createElement('div');
+      item.className = 'note-item active';
+      item.innerHTML = '<div class="note-title">未命名笔记</div><div class="note-date">刚刚</div>';
+      item.onclick = function () { selectNote(this, '未命名笔记'); };
+      document.querySelectorAll('.note-item').forEach(n => n.classList.remove('active'));
+      list.prepend(item);
+      document.querySelector('#subEditorActions input').value = '未命名笔记';
+      switchSub('editor');
+      showToast('已创建新笔记');
+    }
+
+    // ── File click ──
+    function clickFile(el, name) {
+      document.querySelectorAll('.tree-item').forEach(n => n.classList.remove('active'));
+      el.classList.add('active');
+      const badge = document.getElementById('codeBadge');
+      badge.textContent = name; badge.classList.remove('hidden');
+      const path = 'packages/reactivity/' + name;
+      document.getElementById('codePath').textContent = path;
+      document.getElementById('codeHdrPath').textContent = path;
+      switchSub('code');
+    }
+
+    // ── Repo selection ──
+    function selectRepo(el, name) {
+      document.querySelectorAll('.repo-item').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('breadcrumbRepo').textContent = name;
+      showToast('已选择 ' + name);
+    }
+
+    // ── Tree toggle ──
+    let treeCollapsed = false;
+    function toggleTree() {
+      treeCollapsed = !treeCollapsed;
+      document.getElementById('panelTree').classList.toggle('collapsed', treeCollapsed);
+      document.getElementById('treeToggle').classList.toggle('hidden', !treeCollapsed);
+      document.getElementById('divR').style.display = treeCollapsed ? 'none' : '';
+      if (treeCollapsed && currentSub === 'code') switchSub('editor');
+    }
+
+    // ── Star toggle ──
+    function toggleStarBtn(btn) {
+      const starred = btn.classList.contains('accent');
+      btn.classList.toggle('accent', !starred);
+      btn.innerHTML = starred ? '☆ 星标' : '⭐ 已星标';
+      showToast(starred ? '已取消星标' : '已添加星标');
+    }
+
+    // ── User Menu ──
+    function showUserMenu() {
+      const menuItems = [
+        { text: 'Evan You', disabled: true },
+        { separator: true },
+        { text: '@yyx990803', icon: '👤', action: () => window.open('https://github.com/yyx990803', '_blank') },
+        { text: '52 个公开仓库', icon: '📁', disabled: true },
+        { text: '82.5k 粉丝', icon: '👥', disabled: true },
+        { separator: true },
+        { text: '在浏览器中查看', icon: '🔗', action: () => window.open('https://github.com/yyx990803', '_blank') },
+        { text: '账户设置', icon: '⚙️', action: () => showToast('打开设置') },
+        { separator: true },
+        { text: '退出登录', icon: '🚪', action: () => showToast('已退出登录') }
+      ];
+
+      // 创建菜单元素
+      let menu = document.querySelector('.user-menu');
+      if (menu) {
+        menu.remove();
+        return;
+      }
+
+      menu = document.createElement('div');
+      menu.className = 'user-menu';
+      menu.style.cssText = `
+    position: fixed;
+    background: var(--bg-primary);
+    border: 1px solid var(--panel-border-color);
+    border-radius: var(--radius-m);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    z-index: 1000;
+    min-width: 180px;
+    padding: 4px;
+  `;
+
+      // 定位菜单
+      const userContainer = document.querySelector('.user-container');
+      const rect = userContainer.getBoundingClientRect();
+      menu.style.left = rect.left + 'px';
+      menu.style.top = (rect.bottom + 4) + 'px';
+
+      // 创建菜单项
+      menuItems.forEach(item => {
+        if (item.separator) {
+          const sep = document.createElement('div');
+          sep.style.cssText = 'height: 1px; background: var(--panel-border-color); margin: 4px 0;';
+          menu.appendChild(sep);
+        } else {
+          const menuItem = document.createElement('div');
+          menuItem.style.cssText = `
+        padding: 6px 10px;
+        font-size: 12px;
+        color: ${item.disabled ? 'var(--text-faint)' : 'var(--text-normal)'};
+        cursor: ${item.disabled ? 'default' : 'pointer'};
+        border-radius: var(--radius-s);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      `;
+          if (!item.disabled) {
+            menuItem.addEventListener('mouseenter', () => {
+              menuItem.style.background = 'var(--bg-modifier-hover)';
+            });
+            menuItem.addEventListener('mouseleave', () => {
+              menuItem.style.background = 'transparent';
+            });
+            menuItem.addEventListener('click', () => {
+              if (item.action) item.action();
+              menu.remove();
+            });
+          }
+          menuItem.innerHTML = `${item.icon || ''} ${item.text}`;
+          menu.appendChild(menuItem);
+        }
+      });
+
+      document.body.appendChild(menu);
+
+      // 点击外部关闭
+      setTimeout(() => {
+        document.addEventListener('click', function closeMenu(e) {
+          if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+          }
+        });
+      }, 0);
+    }
+
+    // ── Filters ──
+    function setFilter(el) { document.querySelectorAll('.filter-pill').forEach(f => f.classList.remove('active')); el.classList.add('active'); }
+    function filterAct(el) { document.querySelectorAll('.act-filter').forEach(f => f.classList.remove('active')); el.classList.add('active'); }
+    function filterRepos() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      document.querySelectorAll('.repo-item').forEach(c => { c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+    }
+
+    // ── Draggable dividers ──
+    function initDiv(id, panel, min, max, side) {
+      const div = document.getElementById(id); let dragging = false;
+      div.addEventListener('mousedown', e => { dragging = true; div.classList.add('dragging'); document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; e.preventDefault(); });
+      document.addEventListener('mousemove', e => { if (!dragging) return; const main = document.querySelector('.content-area'); const r = main.getBoundingClientRect(); let w = side === 'left' ? e.clientX - r.left : r.right - e.clientX; panel.style.width = Math.max(min, Math.min(w, max)) + 'px'; });
+      document.addEventListener('mouseup', () => { if (!dragging) return; dragging = false; div.classList.remove('dragging'); document.body.style.cursor = ''; document.body.style.userSelect = ''; });
+    }
+    initDiv('divL', document.getElementById('nlPanel'), 150, 280, 'left');
+    initDiv('divR', document.getElementById('panelTree'), 150, 340, 'right');
+
+    // ── Toast ──
+    let tt;
+    function showToast(text) {
+      const t = document.getElementById('toast');
+      document.getElementById('toastText').textContent = text;
+      t.classList.add('show');
+      clearTimeout(tt);
+      tt = setTimeout(() => t.classList.remove('show'), 2200);
+    }
+  </script>
+</body>
+
+</html>
