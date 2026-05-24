@@ -130,6 +130,7 @@ export class StarNestSidebarView extends ItemView {
       if (dbRepos.length === 0) {
         this.repos = [];
         this.filteredRepos = [];
+        this.renderFilters();
         return;
       }
 
@@ -153,9 +154,11 @@ export class StarNestSidebarView extends ItemView {
       }));
 
       this.filteredRepos = [...this.repos];
+      this.renderFilters();
     } catch (error) {
       this.repos = [];
       this.filteredRepos = [];
+      this.renderFilters();
     }
   }
 
@@ -339,14 +342,39 @@ export class StarNestSidebarView extends ItemView {
    */
   private createFilters(container: HTMLElement): void {
     this.filterContainer = container.createDiv('starnest-filter-container');
+    this.renderFilters();
+  }
 
-    const filters = ['全部', '前端', 'Rust', 'AI/ML', '工具链', '未分类'];
+  /**
+   * 渲染筛选器（支持动态更新）
+   */
+  private renderFilters(): void {
+    if (!this.filterContainer) return;
+
+    this.filterContainer.empty();
+
+    // 内置筛选器
+    const builtInFilters = ['全部'];
+
+    // 所有自定义标签（按字母排序）
+    const allTags = Array.from(new Set(
+      this.repos.flatMap(repo => repo.tags)
+    )).sort();
+
+    const filters = [...builtInFilters, ...allTags];
 
     filters.forEach(filter => {
       const pill = this.filterContainer.createEl('span', {
         text: filter,
-        cls: `filter-pill ${filter === '全部' ? 'active' : ''}`
+        cls: `filter-pill ${filter === this.activeFilter ? 'active' : ''}`
       });
+
+      // 如果是标签，添加颜色
+      if (filter !== '全部') {
+        pill.style.backgroundColor = `${this.getTagColor(filter)}1a`;
+        pill.style.color = this.getTagColor(filter);
+        pill.style.border = `1px solid ${this.getTagColor(filter)}33`;
+      }
 
       pill.addEventListener('click', () => {
         // 更新活跃状态
@@ -434,17 +462,19 @@ export class StarNestSidebarView extends ItemView {
     forkSpan.innerHTML = `${ICONS.fork} ${this.formatNumber(repo.forks)}`;
     
     // 更新时间
-    const updatedSpan = meta.createSpan();
-    updatedSpan.innerHTML = `${ICONS.updated} ${repo.updatedAt}`;
+    meta.createSpan({ text: repo.updatedAt });
 
     // 标签
     if (repo.tags.length > 0) {
       const tagsContainer = repoEl.createDiv('repo-item-tags');
       repo.tags.forEach(tag => {
-        tagsContainer.createEl('span', {
+        const tagEl = tagsContainer.createEl('span', {
           text: tag,
           cls: 'repo-item-tag'
         });
+        tagEl.style.backgroundColor = `${this.getTagColor(tag)}1a`;
+        tagEl.style.color = this.getTagColor(tag);
+        tagEl.style.border = `1px solid ${this.getTagColor(tag)}33`;
       });
     }
 
@@ -529,13 +559,9 @@ export class StarNestSidebarView extends ItemView {
       );
     }
 
-    // 分类过滤
+    // 分类过滤（按自定义标签）
     if (this.activeFilter !== '全部') {
-      result = result.filter(repo =>
-        repo.tags.includes(this.activeFilter) ||
-        (this.activeFilter === 'Rust' && repo.language === 'Rust') ||
-        (this.activeFilter === '前端' && ['TypeScript', 'JavaScript'].includes(repo.language))
-      );
+      result = result.filter(repo => repo.tags.includes(this.activeFilter));
     }
 
     // 排序
@@ -666,9 +692,9 @@ export class StarNestSidebarView extends ItemView {
 
     menu.addItem((item) => {
       item
-        .setTitle('添加标签')
+        .setTitle('自定义标签')
         .setIcon('tag')
-        .onClick(() => this.addTagToRepo(repo));
+        .onClick(() => this.openTagEditor(repo));
     });
 
     menu.addItem((item) => {
@@ -745,11 +771,149 @@ export class StarNestSidebarView extends ItemView {
   }
 
   /**
-   * 添加标签到仓库
+   * 自定义标签
    */
-  private addTagToRepo(repo: StarredRepo): void {
-    // 这里应该弹出标签选择/输入对话框
-    new Notice(`为 ${repo.name} 添加标签功能待实现`);
+  private async openTagEditor(repo: StarredRepo): Promise<void> {
+    const allTags = await db.getAllTags();
+    const currentTags = [...repo.tags];
+
+    const modal = document.createElement('div');
+    modal.className = 'starnest-modal-overlay';
+    modal.innerHTML = `
+      <div class="starnest-modal">
+        <div class="starnest-modal-header">
+          <h3>自定义标签</h3>
+          <button class="starnest-modal-close">&times;</button>
+        </div>
+        <div class="starnest-modal-body">
+          <div class="starnest-tags-section">
+            <h4>已添加标签</h4>
+            <div class="starnest-current-tags">
+              ${currentTags.length > 0 ? currentTags.map(tag => `
+                <span class="starnest-tag-item" data-tag="${tag}">
+                  ${tag}
+                  <span class="starnest-tag-remove">&times;</span>
+                </span>
+              `).join('') : '<p class="starnest-empty-text">暂无标签</p>'}
+            </div>
+          </div>
+          <div class="starnest-tags-section">
+            <h4>已有标签</h4>
+            <div class="starnest-existing-tags">
+              ${allTags.filter(t => !currentTags.includes(t)).length > 0 
+                ? allTags.filter(t => !currentTags.includes(t)).map(tag => `
+                  <span class="starnest-tag-suggestion" data-tag="${tag}">${tag}</span>
+                `).join('')
+                : '<p class="starnest-empty-text">无其他标签</p>'}
+            </div>
+          </div>
+          <div class="starnest-tags-section">
+            <h4>添加新标签</h4>
+            <input type="text" class="starnest-tag-input" placeholder="输入标签（按 Enter 确认）" />
+          </div>
+        </div>
+        <div class="starnest-modal-footer">
+          <button class="starnest-modal-btn starnest-modal-btn-primary">保存</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeModal = () => {
+      modal.remove();
+    };
+
+    const saveTags = async () => {
+      await db.updateRepoTags(repo.id, currentTags);
+      await this.refreshRepoList();
+      new Notice('标签已保存');
+      closeModal();
+    };
+
+    modal.querySelector('.starnest-modal-close')?.addEventListener('click', saveTags);
+    modal.querySelector('.starnest-modal-btn-primary')?.addEventListener('click', saveTags);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) saveTags();
+    });
+
+    const addTagToCurrent = (tagName: string) => {
+      const trimmed = tagName.trim();
+      if (trimmed && trimmed.length <= 20 && !currentTags.includes(trimmed)) {
+        currentTags.push(trimmed);
+        renderCurrentTags();
+        renderExistingTags();
+      }
+    };
+
+    const removeTagFromCurrent = (tagName: string) => {
+      const index = currentTags.indexOf(tagName);
+      if (index > -1) {
+        currentTags.splice(index, 1);
+        renderCurrentTags();
+        renderExistingTags();
+      }
+    };
+
+    const renderCurrentTags = () => {
+      const container = modal.querySelector('.starnest-current-tags');
+      if (container) {
+        if (currentTags.length > 0) {
+          container.innerHTML = currentTags.map(tag => `
+            <span class="starnest-tag-item" data-tag="${tag}">
+              ${tag}
+              <span class="starnest-tag-remove">&times;</span>
+            </span>
+          `).join('');
+          container.querySelectorAll('.starnest-tag-item').forEach(el => {
+            el.querySelector('.starnest-tag-remove')?.addEventListener('click', () => {
+              removeTagFromCurrent(el.getAttribute('data-tag') || '');
+            });
+          });
+        } else {
+          container.innerHTML = '<p class="starnest-empty-text">暂无标签</p>';
+        }
+      }
+    };
+
+    const renderExistingTags = () => {
+      const container = modal.querySelector('.starnest-existing-tags');
+      const availableTags = allTags.filter(t => !currentTags.includes(t));
+      if (container) {
+        if (availableTags.length > 0) {
+          container.innerHTML = availableTags.map(tag => `
+            <span class="starnest-tag-suggestion" data-tag="${tag}">${tag}</span>
+          `).join('');
+          container.querySelectorAll('.starnest-tag-suggestion').forEach(el => {
+            el.addEventListener('click', () => {
+              addTagToCurrent(el.getAttribute('data-tag') || '');
+            });
+          });
+        } else {
+          container.innerHTML = '<p class="starnest-empty-text">无其他标签</p>';
+        }
+      }
+    };
+
+    const input = modal.querySelector('.starnest-tag-input') as HTMLInputElement;
+    input?.focus();
+    input?.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        addTagToCurrent(input.value);
+        input.value = '';
+      }
+    });
+
+    modal.querySelectorAll('.starnest-tag-suggestion').forEach(el => {
+      el.addEventListener('click', () => {
+        addTagToCurrent(el.getAttribute('data-tag') || '');
+      });
+    });
+
+    modal.querySelectorAll('.starnest-tag-item').forEach(el => {
+      el.querySelector('.starnest-tag-remove')?.addEventListener('click', () => {
+        removeTagFromCurrent(el.getAttribute('data-tag') || '');
+      });
+    });
   }
 
   /**
@@ -809,10 +973,59 @@ export class StarNestSidebarView extends ItemView {
   }
 
   /**
+   * 根据标签名生成颜色
+   */
+  private getTagColor(tagName: string): string {
+    const colors = [
+      '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
+      '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
+      '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+      '#ec4899', '#f43f5e', '#78716c', '#71717a', '#a1a1aa'
+    ];
+    let hash = 0;
+    for (let i = 0; i < tagName.length; i++) {
+      hash = tagName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length] as string;
+  }
+
+  /**
+   * 刷新仓库列表（从数据库重新加载）
+   */
+  private async refreshRepoList(): Promise<void> {
+    const dbRepos = await db.repos.toArray();
+    this.repos = dbRepos.map((repo: DBRepo) => ({
+      id: repo.id,
+      owner: repo.owner,
+      name: repo.name,
+      description: repo.description,
+      language: repo.language,
+      languageColor: repo.languageColor,
+      stars: repo.stars,
+      forks: repo.forks,
+      updatedAt: new Date(repo.updatedAt).toLocaleDateString('zh-CN'),
+      createdAt: new Date(repo.createdAt).toLocaleDateString('zh-CN'),
+      starredAt: '',
+      topics: repo.topics,
+      tags: repo.tags,
+      isArchived: repo.isArchived,
+      url: repo.htmlUrl
+    }));
+    this.renderFilters();
+    this.applyFilters();
+
+    const userCount = this.containerEl.querySelector('.user-count');
+    if (userCount) {
+      userCount.setText(`${this.repos.length} 个仓库`);
+    }
+  }
+
+  /**
    * 更新仓库列表（从外部调用）
    */
   public updateRepos(repos: StarredRepo[]): void {
     this.repos = repos;
+    this.renderFilters();
     this.applyFilters();
 
     // 更新用户信息区域的仓库数量

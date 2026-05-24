@@ -152,6 +152,50 @@ class StarNestDB extends Dexie {
     if (ids.length === 0) return [];
     return this.repos.where('id').anyOf(ids).toArray();
   }
+
+  /**
+   * 获取所有标签（从所有仓库中提取）
+   */
+  async getAllTags(): Promise<string[]> {
+    const repos = await this.repos.toArray();
+    const tagsSet = new Set<string>();
+    repos.forEach(repo => {
+      repo.tags.forEach(tag => tagsSet.add(tag));
+    });
+    return Array.from(tagsSet).sort();
+  }
+
+  /**
+   * 给仓库添加标签
+   */
+  async addTagToRepo(repoId: number, tag: string): Promise<void> {
+    const repo = await this.repos.get(repoId);
+    if (!repo) return;
+    if (!repo.tags.includes(tag)) {
+      repo.tags = [...repo.tags, tag];
+      await this.repos.put(repo);
+    }
+  }
+
+  /**
+   * 从仓库移除标签
+   */
+  async removeTagFromRepo(repoId: number, tag: string): Promise<void> {
+    const repo = await this.repos.get(repoId);
+    if (!repo) return;
+    repo.tags = repo.tags.filter(t => t !== tag);
+    await this.repos.put(repo);
+  }
+
+  /**
+   * 更新仓库的标签列表
+   */
+  async updateRepoTags(repoId: number, tags: string[]): Promise<void> {
+    const repo = await this.repos.get(repoId);
+    if (!repo) return;
+    repo.tags = tags;
+    await this.repos.put(repo);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

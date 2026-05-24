@@ -602,6 +602,22 @@
   border: 1px solid var(--background-modifier-border);
 }
 
+.starnest-detail-view .info-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.starnest-detail-view .info-card-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 0;
+}
+
 .starnest-detail-view .info-card h3 {
   font-size: 12px;
   font-weight: 600;
@@ -609,6 +625,30 @@
   text-transform: uppercase;
   letter-spacing: 0.6px;
   margin-bottom: 8px;
+}
+
+.starnest-detail-view .info-edit-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--divider-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.starnest-detail-view .info-edit-btn:hover {
+  background: var(--interactive-accent);
+  color: white;
+  border-color: var(--interactive-accent);
+}
+
+.starnest-detail-view .info-empty-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 4px;
 }
 
 .starnest-detail-view .info-row {
@@ -770,4 +810,188 @@
 .starnest-readme-view .markdown-body {
   padding: var(--file-margins);
   margin: 0 auto;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   模态框样式
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.starnest-modal {
+  background: var(--background-primary);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 450px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.starnest-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--divider-color);
+}
+
+.starnest-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.starnest-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.starnest-modal-close:hover {
+  background: var(--background-modifier-hover);
+}
+
+.starnest-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.starnest-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--divider-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.starnest-modal-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--divider-color);
+  background: var(--background-primary);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.starnest-modal-btn-primary {
+  background: var(--interactive-accent);
+  color: white;
+  border: none;
+}
+
+.starnest-modal-btn-primary:hover {
+  background: var(--interactive-accent-hover);
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   标签样式
+   ════════════════════════════════════════════════════════════════════════ */
+.starnest-tags-section {
+  margin-bottom: 20px;
+}
+
+.starnest-tags-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.starnest-existing-tags,
+.starnest-current-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.starnest-tag-suggestion,
+.starnest-tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.starnest-tag-suggestion {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  border: 1px solid var(--divider-color);
+}
+
+.starnest-tag-suggestion:hover {
+  background: var(--background-modifier-active-hover);
+}
+
+.starnest-tag-item {
+  padding-right: 16px;
+  position: relative;
+}
+
+.starnest-tag-remove {
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.starnest-tag-remove:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.starnest-tag-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--divider-color);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+}
+
+.starnest-tag-input:focus {
+  outline: none;
+  border-color: var(--interactive-accent);
+}
+
+.starnest-empty-text {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 13px;
+  padding: 8px 0;
 }
