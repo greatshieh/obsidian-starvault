@@ -1,15 +1,15 @@
 /**
- * StarNest Plugin Settings Tab
+ * StarVault Plugin Settings Tab
  * Obsidian 插件设置页面
  */
 
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
-import StarNestPlugin from './main';
+import StarVaultPlugin from './main';
 
-export class StarNestSettingTab extends PluginSettingTab {
-  plugin: StarNestPlugin;
+export class StarVaultSettingTab extends PluginSettingTab {
+  plugin: StarVaultPlugin;
 
-  constructor(app: App, plugin: StarNestPlugin) {
+  constructor(app: App, plugin: StarVaultPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -18,7 +18,7 @@ export class StarNestSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl('h2', { text: 'StarNest 设置' });
+    containerEl.createEl('h2', { text: 'StarVault 设置' });
 
     // GitHub Token 设置（带登录按钮）
     new Setting(containerEl)

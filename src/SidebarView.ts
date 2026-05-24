@@ -1,5 +1,5 @@
 /**
- * StarNestSidebarView.ts
+ * StarVaultSidebarView.ts
  * Obsidian 侧边栏视图 - 用于展示 GitHub Stars 仓库列表
  *
  * 功能特性：
@@ -11,12 +11,12 @@
  */
 
 import { ItemView, WorkspaceLeaf, setIcon, Menu, TFile, Notice } from 'obsidian';
-import StarNestPlugin from './main';
+import StarVaultPlugin from './main';
 import { db, DBRepo } from './db';
 import { searchService } from './search';
 import { ICONS } from 'constant';
 
-export const VIEW_TYPE_STARNEST_SIDEBAR = 'starnest-sidebar';
+export const VIEW_TYPE_STARNEST_SIDEBAR = 'starvault-sidebar';
 
 // 仓库数据接口
 export interface StarredRepo {
@@ -47,8 +47,8 @@ enum SortOption {
   NAME_DESC = 'name-desc',
 }
 
-export class StarNestSidebarView extends ItemView {
-  plugin: StarNestPlugin;
+export class StarVaultSidebarView extends ItemView {
+  plugin: StarVaultPlugin;
 
   // DOM 元素引用
   private searchInput: HTMLInputElement;
@@ -66,7 +66,7 @@ export class StarNestSidebarView extends ItemView {
   private selectedRepo: StarredRepo | null = null;
   private createNoteBtn: HTMLElement | null = null;
 
-  constructor(leaf: WorkspaceLeaf, plugin: StarNestPlugin) {
+  constructor(leaf: WorkspaceLeaf, plugin: StarVaultPlugin) {
     super(leaf);
     this.plugin = plugin;
     this.repos = [];
@@ -78,7 +78,7 @@ export class StarNestSidebarView extends ItemView {
   }
 
   getDisplayText(): string {
-    return 'StarNest';
+    return 'StarVault';
   }
 
   getIcon(): string {
@@ -90,7 +90,7 @@ export class StarNestSidebarView extends ItemView {
    */
   async onOpen() {
     const container = this.containerEl;
-    container.addClass('starnest-sidebar-view');
+    container.addClass('starvault-sidebar-view');
 
     // 清空容器
     container.empty();
@@ -183,7 +183,7 @@ export class StarNestSidebarView extends ItemView {
    * 创建标题栏
    */
   private createHeader(container: HTMLElement): void {
-    const navHeader = container.createDiv('nav-header starnest-header');
+    const navHeader = container.createDiv('nav-header starvault-header');
 
     // 用户信息区域（左侧）
     const userContainer = navHeader.createDiv('user-container');
@@ -225,7 +225,7 @@ export class StarNestSidebarView extends ItemView {
       '同步 GitHub Stars',
       () => this.syncStars()
     );
-    syncBtn.addClass('starnest-sync-btn');
+    syncBtn.addClass('starvault-sync-btn');
 
     // 排序按钮
     this.sortButton = this.createHeaderButton(
@@ -284,12 +284,12 @@ export class StarNestSidebarView extends ItemView {
    * 更新数量徽章
    */
   private updateCountBadge(container: HTMLElement, count: number): void {
-    const existingBadge = container.querySelector('.starnest-count-badge');
+    const existingBadge = container.querySelector('.starvault-count-badge');
     if (existingBadge) existingBadge.remove();
 
     container.createEl('span', {
       text: count.toString(),
-      cls: 'starnest-count-badge'
+      cls: 'starvault-count-badge'
     });
   }
 
@@ -297,7 +297,7 @@ export class StarNestSidebarView extends ItemView {
    * 创建搜索区域
    */
   private createSearchArea(container: HTMLElement): void {
-    const searchContainer = container.createDiv('starnest-search-container');
+    const searchContainer = container.createDiv('starvault-search-container');
 
     const searchWrapper = searchContainer.createDiv('search-input-container');
 
@@ -341,7 +341,7 @@ export class StarNestSidebarView extends ItemView {
    * 创建过滤器标签
    */
   private createFilters(container: HTMLElement): void {
-    this.filterContainer = container.createDiv('starnest-filter-container');
+    this.filterContainer = container.createDiv('starvault-filter-container');
     this.renderFilters();
   }
 
@@ -393,7 +393,7 @@ export class StarNestSidebarView extends ItemView {
    * 创建仓库列表容器
    */
   private createRepoList(container: HTMLElement): void {
-    this.repoListContainer = container.createDiv('starnest-repo-list nav-files-container');
+    this.repoListContainer = container.createDiv('starvault-repo-list nav-files-container');
   }
 
   /**
@@ -418,7 +418,7 @@ export class StarNestSidebarView extends ItemView {
    */
   private createRepoElement(repo: StarredRepo): HTMLElement {
     const repoEl = this.repoListContainer.createDiv(
-      `starnest-repo-item ${this.selectedRepoId === repo.id ? 'active' : ''}`
+      `starvault-repo-item ${this.selectedRepoId === repo.id ? 'active' : ''}`
     );
     repoEl.setAttribute('data-repo-id', repo.id.toString());
 
@@ -496,7 +496,7 @@ export class StarNestSidebarView extends ItemView {
    * 渲染空状态
    */
   private renderEmptyState(): void {
-    const emptyState = this.repoListContainer.createDiv('starnest-empty-state');
+    const emptyState = this.repoListContainer.createDiv('starvault-empty-state');
 
     const iconEl = emptyState.createDiv('empty-icon');
     setIcon(iconEl, 'inbox');
@@ -524,7 +524,7 @@ export class StarNestSidebarView extends ItemView {
     this.selectedRepo = repo;
 
     // 更新 UI 活跃状态
-    this.repoListContainer.querySelectorAll('.starnest-repo-item').forEach(el => {
+    this.repoListContainer.querySelectorAll('.starvault-repo-item').forEach(el => {
       el.removeClass('active');
     });
     const activeEl = this.repoListContainer.querySelector(`[data-repo-id="${repo.id}"]`);
@@ -639,7 +639,7 @@ export class StarNestSidebarView extends ItemView {
         .onClick(() => {
           // 打开设置
           (this.app as any).setting.open();
-          (this.app as any).setting.openTabById('starnest');
+          (this.app as any).setting.openTabById('starvault');
         });
     });
 
@@ -720,7 +720,7 @@ export class StarNestSidebarView extends ItemView {
    * 同步 Stars
    */
   private async syncStars(): Promise<void> {
-    const syncBtn = this.containerEl.querySelector('.starnest-sync-btn');
+    const syncBtn = this.containerEl.querySelector('.starvault-sync-btn');
     if (syncBtn) {
       syncBtn.addClass('is-syncing');
     }
@@ -778,42 +778,42 @@ export class StarNestSidebarView extends ItemView {
     const currentTags = [...repo.tags];
 
     const modal = document.createElement('div');
-    modal.className = 'starnest-modal-overlay';
+    modal.className = 'starvault-modal-overlay';
     modal.innerHTML = `
-      <div class="starnest-modal">
-        <div class="starnest-modal-header">
+      <div class="starvault-modal">
+        <div class="starvault-modal-header">
           <h3>自定义标签</h3>
-          <button class="starnest-modal-close">&times;</button>
+          <button class="starvault-modal-close">&times;</button>
         </div>
-        <div class="starnest-modal-body">
-          <div class="starnest-tags-section">
+        <div class="starvault-modal-body">
+          <div class="starvault-tags-section">
             <h4>已添加标签</h4>
-            <div class="starnest-current-tags">
+            <div class="starvault-current-tags">
               ${currentTags.length > 0 ? currentTags.map(tag => `
-                <span class="starnest-tag-item" data-tag="${tag}">
+                <span class="starvault-tag-item" data-tag="${tag}">
                   ${tag}
-                  <span class="starnest-tag-remove">&times;</span>
+                  <span class="starvault-tag-remove">&times;</span>
                 </span>
-              `).join('') : '<p class="starnest-empty-text">暂无标签</p>'}
+              `).join('') : '<p class="starvault-empty-text">暂无标签</p>'}
             </div>
           </div>
-          <div class="starnest-tags-section">
+          <div class="starvault-tags-section">
             <h4>已有标签</h4>
-            <div class="starnest-existing-tags">
+            <div class="starvault-existing-tags">
               ${allTags.filter(t => !currentTags.includes(t)).length > 0 
                 ? allTags.filter(t => !currentTags.includes(t)).map(tag => `
-                  <span class="starnest-tag-suggestion" data-tag="${tag}">${tag}</span>
+                  <span class="starvault-tag-suggestion" data-tag="${tag}">${tag}</span>
                 `).join('')
-                : '<p class="starnest-empty-text">无其他标签</p>'}
+                : '<p class="starvault-empty-text">无其他标签</p>'}
             </div>
           </div>
-          <div class="starnest-tags-section">
+          <div class="starvault-tags-section">
             <h4>添加新标签</h4>
-            <input type="text" class="starnest-tag-input" placeholder="输入标签（按 Enter 确认）" />
+            <input type="text" class="starvault-tag-input" placeholder="输入标签（按 Enter 确认）" />
           </div>
         </div>
-        <div class="starnest-modal-footer">
-          <button class="starnest-modal-btn starnest-modal-btn-primary">保存</button>
+        <div class="starvault-modal-footer">
+          <button class="starvault-modal-btn starvault-modal-btn-primary">保存</button>
         </div>
       </div>
     `;
@@ -830,8 +830,8 @@ export class StarNestSidebarView extends ItemView {
       closeModal();
     };
 
-    modal.querySelector('.starnest-modal-close')?.addEventListener('click', saveTags);
-    modal.querySelector('.starnest-modal-btn-primary')?.addEventListener('click', saveTags);
+    modal.querySelector('.starvault-modal-close')?.addEventListener('click', saveTags);
+    modal.querySelector('.starvault-modal-btn-primary')?.addEventListener('click', saveTags);
     modal.addEventListener('click', (e) => {
       if (e.target === modal) saveTags();
     });
@@ -855,46 +855,46 @@ export class StarNestSidebarView extends ItemView {
     };
 
     const renderCurrentTags = () => {
-      const container = modal.querySelector('.starnest-current-tags');
+      const container = modal.querySelector('.starvault-current-tags');
       if (container) {
         if (currentTags.length > 0) {
           container.innerHTML = currentTags.map(tag => `
-            <span class="starnest-tag-item" data-tag="${tag}">
+            <span class="starvault-tag-item" data-tag="${tag}">
               ${tag}
-              <span class="starnest-tag-remove">&times;</span>
+              <span class="starvault-tag-remove">&times;</span>
             </span>
           `).join('');
-          container.querySelectorAll('.starnest-tag-item').forEach(el => {
-            el.querySelector('.starnest-tag-remove')?.addEventListener('click', () => {
+          container.querySelectorAll('.starvault-tag-item').forEach(el => {
+            el.querySelector('.starvault-tag-remove')?.addEventListener('click', () => {
               removeTagFromCurrent(el.getAttribute('data-tag') || '');
             });
           });
         } else {
-          container.innerHTML = '<p class="starnest-empty-text">暂无标签</p>';
+          container.innerHTML = '<p class="starvault-empty-text">暂无标签</p>';
         }
       }
     };
 
     const renderExistingTags = () => {
-      const container = modal.querySelector('.starnest-existing-tags');
+      const container = modal.querySelector('.starvault-existing-tags');
       const availableTags = allTags.filter(t => !currentTags.includes(t));
       if (container) {
         if (availableTags.length > 0) {
           container.innerHTML = availableTags.map(tag => `
-            <span class="starnest-tag-suggestion" data-tag="${tag}">${tag}</span>
+            <span class="starvault-tag-suggestion" data-tag="${tag}">${tag}</span>
           `).join('');
-          container.querySelectorAll('.starnest-tag-suggestion').forEach(el => {
+          container.querySelectorAll('.starvault-tag-suggestion').forEach(el => {
             el.addEventListener('click', () => {
               addTagToCurrent(el.getAttribute('data-tag') || '');
             });
           });
         } else {
-          container.innerHTML = '<p class="starnest-empty-text">无其他标签</p>';
+          container.innerHTML = '<p class="starvault-empty-text">无其他标签</p>';
         }
       }
     };
 
-    const input = modal.querySelector('.starnest-tag-input') as HTMLInputElement;
+    const input = modal.querySelector('.starvault-tag-input') as HTMLInputElement;
     input?.focus();
     input?.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter') {
@@ -903,14 +903,14 @@ export class StarNestSidebarView extends ItemView {
       }
     });
 
-    modal.querySelectorAll('.starnest-tag-suggestion').forEach(el => {
+    modal.querySelectorAll('.starvault-tag-suggestion').forEach(el => {
       el.addEventListener('click', () => {
         addTagToCurrent(el.getAttribute('data-tag') || '');
       });
     });
 
-    modal.querySelectorAll('.starnest-tag-item').forEach(el => {
-      el.querySelector('.starnest-tag-remove')?.addEventListener('click', () => {
+    modal.querySelectorAll('.starvault-tag-item').forEach(el => {
+      el.querySelector('.starvault-tag-remove')?.addEventListener('click', () => {
         removeTagFromCurrent(el.getAttribute('data-tag') || '');
       });
     });
@@ -936,7 +936,7 @@ export class StarNestSidebarView extends ItemView {
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = `starnest-export-${Date.now()}.json`;
+    a.download = `starvault-export-${Date.now()}.json`;
     a.click();
 
     URL.revokeObjectURL(url);

@@ -1,20 +1,20 @@
 /**
- * StarNestDetailView.ts
+ * StarVaultDetailView.ts
  * 右侧边栏视图 - 用于显示仓库详情
  * 按照 preview.html 的样式重新设计
  */
 
 import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
-import StarNestPlugin from './main';
+import StarVaultPlugin from './main';
 import { StarredRepo } from './SidebarView';
 
-export const VIEW_TYPE_STARNEST_DETAIL = 'starnest-detail';
+export const VIEW_TYPE_STARNEST_DETAIL = 'starvault-detail';
 
-export class StarNestDetailView extends ItemView {
-	plugin: StarNestPlugin;
+export class StarVaultDetailView extends ItemView {
+	plugin: StarVaultPlugin;
 	private currentRepo: StarredRepo | null = null;
 
-	constructor(leaf: WorkspaceLeaf, plugin: StarNestPlugin) {
+	constructor(leaf: WorkspaceLeaf, plugin: StarVaultPlugin) {
 		super(leaf);
 		this.plugin = plugin;
 	}
@@ -44,7 +44,7 @@ export class StarNestDetailView extends ItemView {
 	 */
 	async onOpen() {
 		const container = this.containerEl;
-		container.addClass('starnest-detail-view');
+		container.addClass('starvault-detail-view');
 		container.empty();
 		this.render();
 	}
@@ -113,7 +113,7 @@ export class StarNestDetailView extends ItemView {
 				cls: 'info-edit-btn'
 			});
 			editBtn.addEventListener('click', () => {
-				const sidebarView = this.app.workspace.getLeavesOfType('starnest-sidebar')[0];
+				const sidebarView = this.app.workspace.getLeavesOfType('starvault-sidebar')[0];
 				if (sidebarView) {
 					const view = sidebarView.view as any;
 					if (view && view.openTagEditor) {
@@ -141,7 +141,7 @@ export class StarNestDetailView extends ItemView {
 				cls: 'info-edit-btn'
 			});
 			addBtn.addEventListener('click', () => {
-				const sidebarView = this.app.workspace.getLeavesOfType('starnest-sidebar')[0];
+				const sidebarView = this.app.workspace.getLeavesOfType('starvault-sidebar')[0];
 				if (sidebarView) {
 					const view = sidebarView.view as any;
 					if (view && view.openTagEditor) {

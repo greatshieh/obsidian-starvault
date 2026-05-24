@@ -73,7 +73,7 @@ interface DBSyncState {
 // 数据库类
 // ═══════════════════════════════════════════════════════════════
 
-class StarNestDB extends Dexie {
+class StarVaultDB extends Dexie {
   repos!: Table<DBRepo, number>;
   notes!: Table<DBNote, string>;
   tags!: Table<DBTag, string>;
@@ -81,7 +81,7 @@ class StarNestDB extends Dexie {
   syncState!: Table<DBSyncState, string>;
 
   constructor() {
-    super('StarNestDB');
+    super('StarVaultDB');
     
     this.version(1).stores({
       // 仓库表：主键 id，多个索引用于排序和过滤
@@ -234,4 +234,4 @@ export function githubRepoToDBRepo(item: any, languageColor: string): DBRepo {
 }
 
 // 导出数据库实例
-export const db = new StarNestDB();
+export const db = new StarVaultDB();

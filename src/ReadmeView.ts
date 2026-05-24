@@ -1,21 +1,21 @@
 /**
- * StarNest README View
+ * StarVault README View
  * 在编辑器区显示仓库 README 的视图
  */
 
 import { ItemView, WorkspaceLeaf, MarkdownRenderer } from 'obsidian';
-import StarNestPlugin from './main';
+import StarVaultPlugin from './main';
 import { StarredRepo } from './SidebarView';
 
-export const VIEW_TYPE_STARNEST_README = 'starnest-readme';
+export const VIEW_TYPE_STARNEST_README = 'starvault-readme';
 
-export class StarNestReadmeView extends ItemView {
-	plugin: StarNestPlugin;
+export class StarVaultReadmeView extends ItemView {
+	plugin: StarVaultPlugin;
 	private currentRepo: StarredRepo | null = null;
 	private readmeContent: string | null = null;
 	private isLoading: boolean = false;
 
-	constructor(leaf: WorkspaceLeaf, plugin: StarNestPlugin) {
+	constructor(leaf: WorkspaceLeaf, plugin: StarVaultPlugin) {
 		super(leaf);
 		this.plugin = plugin;
 	}
@@ -90,7 +90,7 @@ export class StarNestReadmeView extends ItemView {
 	 */
 	async onOpen() {
 		const container = this.containerEl;
-		container.addClass('starnest-readme-view');
+		container.addClass('starvault-readme-view');
 		container.empty();
 		await this.render();
 	}

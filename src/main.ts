@@ -1,13 +1,13 @@
 /**
- * StarNest Plugin - Main Entry
+ * StarVault Plugin - Main Entry
  * Obsidian 插件主入口文件
  */
 
 import { Plugin, WorkspaceLeaf, TFile, ItemView, Notice } from 'obsidian';
-import { StarNestSidebarView, VIEW_TYPE_STARNEST_SIDEBAR, StarredRepo } from './SidebarView';
-import { StarNestDetailView, VIEW_TYPE_STARNEST_DETAIL } from './DetailView';
-import { StarNestReadmeView, VIEW_TYPE_STARNEST_README } from './ReadmeView';
-import { StarNestSettingTab } from './settings';
+import { StarVaultSidebarView, VIEW_TYPE_STARNEST_SIDEBAR, StarredRepo } from './SidebarView';
+import { StarVaultDetailView, VIEW_TYPE_STARNEST_DETAIL } from './DetailView';
+import { StarVaultReadmeView, VIEW_TYPE_STARNEST_README } from './ReadmeView';
+import { StarVaultSettingTab } from './settings';
 import { Octokit } from 'octokit';
 import { db, githubRepoToDBRepo } from './db';
 import { searchService } from './search';
@@ -15,7 +15,7 @@ import * as languageColorsRaw from './color.json';
 const languageColors = languageColorsRaw as Record<string, string>;
 
 // 插件设置接口
-interface StarNestSettings {
+interface StarVaultSettings {
 	githubToken: string;
 	username: string;
 	userAvatar: string;
@@ -29,7 +29,7 @@ interface StarNestSettings {
 }
 
 // 默认设置
-const DEFAULT_SETTINGS: StarNestSettings = {
+const DEFAULT_SETTINGS: StarVaultSettings = {
 	githubToken: '',
 	username: '',
 	userAvatar: '',
@@ -61,11 +61,11 @@ url: {{url}}
 	noteNameTemplate: '{{repo}}',
 };
 
-export default class StarNestPlugin extends Plugin {
-	settings: StarNestSettings;
-	sidebarView: StarNestSidebarView | null = null;
-	detailView: StarNestDetailView | null = null;
-	readmeView: StarNestReadmeView | null = null;
+export default class StarVaultPlugin extends Plugin {
+	settings: StarVaultSettings;
+	sidebarView: StarVaultSidebarView | null = null;
+	detailView: StarVaultDetailView | null = null;
+	readmeView: StarVaultReadmeView | null = null;
 	octokit: Octokit | null = null;
 
 	async onload() {
@@ -79,7 +79,7 @@ export default class StarNestPlugin extends Plugin {
 		this.registerView(
 			VIEW_TYPE_STARNEST_SIDEBAR,
 			(leaf: WorkspaceLeaf) => {
-				this.sidebarView = new StarNestSidebarView(leaf, this);
+				this.sidebarView = new StarVaultSidebarView(leaf, this);
 				return this.sidebarView;
 			}
 		);
@@ -88,7 +88,7 @@ export default class StarNestPlugin extends Plugin {
 		this.registerView(
 			VIEW_TYPE_STARNEST_DETAIL,
 			(leaf: WorkspaceLeaf) => {
-				this.detailView = new StarNestDetailView(leaf, this);
+				this.detailView = new StarVaultDetailView(leaf, this);
 				return this.detailView;
 			}
 		);
@@ -97,27 +97,27 @@ export default class StarNestPlugin extends Plugin {
 		this.registerView(
 			VIEW_TYPE_STARNEST_README,
 			(leaf: WorkspaceLeaf) => {
-				this.readmeView = new StarNestReadmeView(leaf, this);
+				this.readmeView = new StarVaultReadmeView(leaf, this);
 				return this.readmeView;
 			}
 		);
 
 		// 添加命令
 		this.addCommand({
-			id: 'open-starnest-sidebar',
-			name: '打开 StarNest 侧边栏',
+			id: 'open-starvault-sidebar',
+			name: '打开 StarVault 侧边栏',
 			callback: () => this.activateSidebarView(),
 		});
 
 		this.addCommand({
-			id: 'open-starnest-detail',
-			name: '打开 StarNest 详情',
+			id: 'open-starvault-detail',
+			name: '打开 StarVault 详情',
 			callback: () => this.activateDetailView(),
 		});
 
 		this.addCommand({
-			id: 'open-starnest-readme',
-			name: '打开 StarNest README',
+			id: 'open-starvault-readme',
+			name: '打开 StarVault README',
 			callback: () => this.activateReadmeView(),
 		});
 
@@ -134,7 +134,7 @@ export default class StarNestPlugin extends Plugin {
 		});
 
 		// 添加设置页
-		this.addSettingTab(new StarNestSettingTab(this.app, this));
+		this.addSettingTab(new StarVaultSettingTab(this.app, this));
 
 		// 如果设置了启动时同步
 		if (this.settings.syncOnStartup) {
@@ -240,9 +240,9 @@ export default class StarNestPlugin extends Plugin {
 	}
 
 	/**
-	 * 打开 StarNest 侧边栏
+	 * 打开 StarVault 侧边栏
 	 */
-	async openStarNestSidebar(): Promise<void> {
+	async openStarVaultSidebar(): Promise<void> {
 		await this.activateSidebarView();
 	}
 
@@ -253,7 +253,7 @@ export default class StarNestPlugin extends Plugin {
 		if (!this.settings.githubToken) {
 			// 打开设置页提示用户配置 Token
 			(this.app as any).setting.open();
-			(this.app as any).setting.openTabById('starnest');
+			(this.app as any).setting.openTabById('starvault');
 			return;
 		}
 
