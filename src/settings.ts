@@ -5,6 +5,8 @@
 
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import StarVaultPlugin from './main';
+import { db } from './db';
+import { searchService } from './search';
 
 export class StarVaultSettingTab extends PluginSettingTab {
   plugin: StarVaultPlugin;
@@ -233,5 +235,46 @@ export class StarVaultSettingTab extends PluginSettingTab {
         text.inputEl.style.fontFamily = 'monospace';
         return text;
       });
+
+    containerEl.createEl('h3', { text: '数据管理' });
+
+    // 删除数据库
+    new Setting(containerEl)
+      .setName('删除所有仓库数据')
+      .setDesc('删除本地数据库中所有的仓库数据。此操作不可恢复！')
+      .addButton(button => button
+        .setButtonText('删除仓库数据')
+        .setWarning()
+        .onClick(async () => {
+          const confirmed = window.confirm(
+            '确定要删除所有仓库数据吗？\n\n此操作将删除本地数据库中的所有仓库数据，包括自定义标签。删除后需要重新同步。此操作不可恢复！'
+          );
+          
+          if (!confirmed) return;
+          
+          try {
+            button.setButtonText('删除中...');
+            button.setDisabled(true);
+            
+            // 清空数据库
+            await db.repos.clear();
+            
+            // 重建搜索索引
+            await searchService.buildIndex();
+            
+            // 更新侧边栏
+            if (this.plugin.sidebarView) {
+              await this.plugin.sidebarView.loadReposFromDB();
+              this.plugin.sidebarView.updateRepos([]);
+            }
+            
+            new Notice('所有仓库数据已删除');
+          } catch (error) {
+            new Notice('删除失败：' + (error instanceof Error ? error.message : '未知错误'));
+          } finally {
+            button.setButtonText('删除仓库数据');
+            button.setDisabled(false);
+          }
+        }));
   }
 }

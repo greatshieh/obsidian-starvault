@@ -727,7 +727,6 @@ export class StarVaultSidebarView extends ItemView {
 
     try {
       await this.plugin.syncGitHubStars();
-      new Notice(`同步完成！共 ${this.repos.length} 个仓库`);
     } catch (error: any) {
       new Notice('同步失败: ' + (error.message || '未知错误'));
     } finally {

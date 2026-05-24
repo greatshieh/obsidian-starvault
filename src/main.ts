@@ -331,26 +331,6 @@ export default class StarVaultPlugin extends Plugin {
 				this.sidebarView.updateRepos(starredRepos);
 			}
 
-			// 第七步：保存到本地数据（兼容旧版本）
-			const oldFormatRepos: StarredRepo[] = rawRepos.map(item => ({
-				id: item.id,
-				owner: item.owner?.login || 'unknown',
-				name: item.name || 'repo',
-				description: item.description || '',
-				language: item.language || 'Unknown',
-				languageColor: this.getLanguageColor(item.language),
-				stars: item.stargazers_count || 0,
-				forks: item.forks_count || 0,
-				updatedAt: this.formatRelativeTime(item.updated_at),
-				createdAt: this.formatRelativeTime(item.created_at),
-				starredAt: this.formatRelativeTime(item.starred_at),
-				topics: item.topics || [],
-				tags: [],
-				isArchived: item.archived || false,
-				url: item.html_url || '',
-			}));
-			await this.saveStarsToData(oldFormatRepos);
-
 			// 完成
 			new Notice(`同步完成！共 ${rawRepos.length} 个仓库`);
 		} catch (error) {
@@ -358,82 +338,7 @@ export default class StarVaultPlugin extends Plugin {
 		}
 	}
 
-	/**
-	 * 从 GitHub API 获取 Starred 仓库（使用 Octokit），带进度回调
-	 */
-	private async fetchGitHubStarsWithProgress(
-		onProgress?: (totalFetched: number, page: number) => void
-	): Promise<StarredRepo[]> {
-		if (!this.octokit) {
-			throw new Error('Octokit not initialized');
-		}
 
-		const repos: StarredRepo[] = [];
-		let page = 1;
-		const perPage = 100;
-		let totalFetched = 0;
-
-		while (true) {
-			const response = await this.octokit.request(
-				'GET /user/starred',
-				{
-					per_page: perPage,
-					page: page,
-					headers: {
-						'X-GitHub-Api-Version': '2026-03-10',
-					},
-				}
-			);
-
-			const data = response.data as any[];
-
-			if (data.length === 0) break;
-
-			repos.push(...data.map((item: any) => ({
-				id: item.id,
-				owner: item.owner.login,
-				name: item.name,
-				description: item.description || '',
-				language: item.language || 'Unknown',
-				languageColor: this.getLanguageColor(item.language),
-				stars: item.stargazers_count,
-				forks: item.forks_count,
-				updatedAt: this.formatRelativeTime(item.updated_at),
-				createdAt: this.formatRelativeTime(item.created_at),
-				starredAt: this.formatRelativeTime(item.starred_at),
-				topics: item.topics || [],
-				tags: [], // 从本地数据获取
-				isArchived: item.archived,
-				url: item.html_url,
-			})));
-
-			totalFetched += data.length;
-			onProgress?.(totalFetched, page);
-
-			if (data.length < perPage) break;
-			page++;
-		}
-
-		return repos;
-	}
-
-	/**
-	 * 保存 Stars 到本地数据
-	 */
-	private async saveStarsToData(repos: StarredRepo[]): Promise<void> {
-		const data = await this.loadData() || {};
-		data.stars = repos;
-		data.lastSync = Date.now();
-		await this.saveData(data);
-	}
-
-	/**
-	 * 从本地数据加载 Stars
-	 */
-	async loadStarsFromData(): Promise<StarredRepo[]> {
-		const data = await this.loadData() || {};
-		return data.stars || [];
-	}
 
 	/**
 	 * 设置自动同步
