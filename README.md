@@ -1,90 +1,196 @@
-# Obsidian Sample Plugin
+# StarVault
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+一个 Obsidian 插件，用于管理你的 GitHub Stars 仓库。
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## 功能特性
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+### 核心功能
 
-## First time developing plugins?
+- **GitHub Stars 同步** - 使用 Octokit 自动同步你的 GitHub 标星仓库
+- **本地持久化存储** - 使用 IndexedDB 存储仓库数据，支持离线访问
+- **全文搜索** - 基于 MiniSearch 的中文全文搜索，支持仓库描述、语言、topics 和自定义标签搜索
+- **自定义标签** - 为仓库添加、编辑自定义标签，右键菜单快速操作
 
-Quick starting guide for new plugin devs:
+### 仓库管理
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+- **仓库列表展示** - 显示仓库名称、描述、语言、Star 数、Fork 数等
+- **多维度筛选** - 按标签、语言筛选
+- **多种排序** - 按 Star 数、更新时间、名称排序
+- **仓库详情** - 在侧边栏显示仓库详细信息
 
-## Releasing new releases
+### README 查看
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+- **嵌入式 README** - 在编辑器区直接显示仓库 README
+- **GitHub 样式** - 使用 GitHub Markdown CSS 样式
+- **流畅滚动** - 独立的滚动区域
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+### 笔记功能
 
-## Adding your plugin to the community plugin list
+- **模板化笔记** - 根据自定义模板创建仓库笔记
+- **灵活配置** - 支持路径模板、文件名模板、内容模板
+- **变量替换** - 支持丰富的模板变量
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+### 同步设置
 
-## How to use
+- **启动时同步** - Obsidian 启动时自动同步
+- **自动同步** - 可设置自动同步间隔
+- **手动同步** - 一键手动同步
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+## 安装
 
-## Manually installing the plugin
+### 手动安装
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+1. 下载最新版本的 `main.js`、`manifest.json` 和 `styles.css`
+2. 将文件复制到 `<Vault>/.obsidian/plugins/starvault/` 目录
+3. 在 Obsidian 设置中启用插件
 
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
+### 开发版本
 
-## Funding URL
+```bash
+# 克隆仓库
+git clone https://github.com/xiewei007/starvault.git
 
-You can include funding URLs where people who use your plugin can financially support it.
+# 安装依赖
+npm install
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+# 开发模式（监视编译）
+npm run dev
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+# 生产构建
+npm run build
 ```
 
-If you have multiple URLs, you can also do:
+## 使用指南
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+### 首次设置
+
+1. 打开 Obsidian 设置 → 社区插件 → 启用 StarVault
+2. 点击 StarVault 设置标签
+3. 在 "GitHub Token" 输入框中填入你的 GitHub Personal Access Token
+4. 点击 "登录" 按钮验证 Token
+5. 使用命令面板（Ctrl/Cmd + P）执行 "同步 GitHub Stars"
+
+### 创建 GitHub Token
+
+1. 访问 GitHub Settings → Developer settings → Personal access tokens
+2. 点击 "Generate new token (classic)"
+3. 勾选 `repo` 权限范围
+4. 生成 Token 并妥善保存
+
+### 同步仓库
+
+- **手动同步**：命令面板执行 "同步 GitHub Stars"
+- **自动同步**：在设置中启用自动同步并设置间隔
+
+### 搜索仓库
+
+在侧边栏顶部的搜索框中输入关键词，支持：
+- 仓库名称
+- 仓库描述
+- 编程语言
+- Topics
+- 自定义标签
+
+### 管理标签
+
+- **添加标签**：右键仓库卡片，选择 "自定义标签"
+- **编辑标签**：在标签编辑弹窗中添加或删除标签
+- **筛选标签**：点击侧边栏顶部的标签筛选器
+
+### 创建笔记
+
+1. 右键仓库卡片，选择 "创建笔记"
+2. 或使用命令面板执行 "为当前仓库创建笔记"
+
+## 配置选项
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| GitHub Token | 访问 GitHub API 的令牌 | - |
+| 启动时同步 | 启动 Obsidian 时自动同步 | 关闭 |
+| 自动同步间隔 | 自动同步间隔（分钟），0 表示关闭 | 0 |
+| 默认排序 | 仓库列表默认排序方式 | Star 数（高 → 低） |
+| 显示归档仓库 | 是否在列表中显示已归档仓库 | 关闭 |
+| 笔记路径模板 | 创建笔记的文件夹路径 | StarVault |
+| 笔记名称模板 | 创建笔记的文件名 | {{repo}} |
+| 笔记内容模板 | 笔记内容模板 | 见下方 |
+
+### 笔记模板变量
+
+```
+{{repo}}         - 仓库名称
+{{owner}}        - 仓库所有者
+{{starnumber}}   - Star 数量
+{{starred-at}}   - 收藏时间
+{{updated_at}}   - 更新时间
+{{created-at}}   - 创建时间
+{{language}}     - 编程语言
+{{tags}}         - Topics 列表
+{{url}}          - GitHub 仓库 URL
+{{repo.name}}    - 仓库名称
+{{repo.description}} - 仓库描述
+{{repo.stars}}   - Star 数量
+{{repo.forks}}   - Fork 数量
 ```
 
-## API Documentation
+## 数据存储
 
-See https://docs.obsidian.md
+StarVault 使用以下本地存储：
+
+- **IndexedDB (StarVaultDB)** - 存储仓库数据、标签、笔记关联
+- **LocalStorage (data.json)** - 存储插件设置
+
+所有数据保存在本地，不会上传至任何服务器。
+
+## 技术栈
+
+- **TypeScript** - 类型安全
+- **Dexie.js** - IndexedDB 封装
+- **MiniSearch** - 全文搜索引擎
+- **Octokit** - GitHub API 客户端
+
+## 键盘快捷键
+
+| 命令 | 快捷键 |
+|------|--------|
+| 打开侧边栏 | Ctrl/Cmd + P → "打开 StarVault 侧边栏" |
+| 同步 Stars | Ctrl/Cmd + P → "同步 GitHub Stars" |
+
+## 常见问题
+
+### Q: 同步失败怎么办？
+
+A: 请检查：
+1. GitHub Token 是否有效
+2. 网络连接是否正常
+3. Token 是否有 `repo` 权限
+
+### Q: 搜索不到结果？
+
+A: 请确保：
+1. 已经执行过同步
+2. 搜索关键词正确
+3. 尝试使用简短关键词
+
+### Q: 如何删除所有数据？
+
+A: 在设置页面 → 数据管理 → 删除仓库数据
+
+## 更新日志
+
+### v0.1.0
+
+- 初始版本发布
+- GitHub Stars 同步
+- IndexedDB 本地存储
+- MiniSearch 全文搜索
+- 自定义标签
+- 仓库笔记创建
+
+## 许可证
+
+MIT License
+
+## 作者
+
+[greatshieh](https://github.com/greatshieh)
