@@ -66,6 +66,13 @@ export class StarNestDetailView extends ItemView {
 		// 创建详情侧边栏容器
 		const sidebar = container.createDiv('readme-sidebar');
 
+		// Description 卡片
+		if (repo.description) {
+			const descCard = sidebar.createDiv('info-card');
+			descCard.createEl('h3', { text: '描述' });
+			descCard.createDiv('info-description').setText(repo.description);
+		}
+
 		// Topics 卡片
 		if (repo.topics && repo.topics.length > 0) {
 			const topicsCard = sidebar.createDiv('info-card');

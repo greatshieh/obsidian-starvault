@@ -602,6 +602,14 @@
   border: 1px solid var(--background-modifier-border);
 }
 
+.starnest-detail-view .info-description {
+  font-size: 13px;
+  color: var(--text-normal);
+  line-height: 1.5;
+  margin-top: 6px;
+  word-break: break-word;
+}
+
 .starnest-detail-view .info-card-header {
   display: flex;
   align-items: center;
