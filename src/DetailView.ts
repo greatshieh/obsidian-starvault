@@ -7,6 +7,7 @@
 import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
 import StarVaultPlugin from './main';
 import { StarredRepo } from './SidebarView';
+import { db } from './db';
 
 export const VIEW_TYPE_STARNEST_DETAIL = 'starvault-detail';
 
@@ -210,6 +211,135 @@ export class StarVaultDetailView extends ItemView {
 				new Notice('创建笔记失败: ' + error.message);
 			}
 		});
+
+		// 取消标星/恢复/删除按钮
+		const isSoftDeleted = repo.deletedAt !== null && repo.deletedAt > 0;
+		const currentRepoId = repo.id;
+		
+		if (!isSoftDeleted) {
+			// 未删除状态：显示取消标星按钮
+			const cancelStarBtn = linkCard.createEl('button', {
+				text: '取消标星',
+				cls: 'info-link'
+			});
+			
+			cancelStarBtn.addEventListener('click', async () => {
+				try {
+					await db.softDeleteRepo(repo.id);
+					new Notice(`已取消标星: ${repo.owner}/${repo.name}`);
+					// 刷新侧边栏 - 统一从数据库重新加载并保持选中状态
+					if (this.plugin.sidebarView) {
+						await this.plugin.sidebarView.loadReposFromDB();
+						// 先设置选中状态，再渲染，最后触发选中事件更新详情
+						this.plugin.sidebarView.selectedRepoId = currentRepoId;
+						this.plugin.sidebarView.renderRepoList();
+						const updatedRepo = this.plugin.sidebarView.repos.find(r => r.id === currentRepoId);
+						if (updatedRepo) {
+							this.plugin.sidebarView.selectRepo(updatedRepo);
+						}
+					}
+				} catch (error: any) {
+					new Notice('操作失败: ' + error.message);
+				}
+			});
+		} else {
+			// 软删除状态：显示恢复和删除按钮
+			const restoreBtn = linkCard.createEl('button', {
+				text: '恢复',
+				cls: 'info-restore-btn'
+			});
+			
+			restoreBtn.addEventListener('click', async () => {
+				try {
+					await db.restoreRepo(repo.id);
+					new Notice(`已恢复标星: ${repo.owner}/${repo.name}`);
+					// 刷新侧边栏并保持选中状态
+					if (this.plugin.sidebarView) {
+						await this.plugin.sidebarView.loadReposFromDB();
+						// 先设置选中状态，再渲染，最后触发选中事件更新详情
+						this.plugin.sidebarView.selectedRepoId = currentRepoId;
+						this.plugin.sidebarView.renderRepoList();
+						const updatedRepo = this.plugin.sidebarView.repos.find(r => r.id === currentRepoId);
+						if (updatedRepo) {
+							this.plugin.sidebarView.selectRepo(updatedRepo);
+						}
+					}
+				} catch (error: any) {
+					new Notice('恢复失败: ' + error.message);
+				}
+			});
+			
+			const deleteBtn = linkCard.createEl('button', {
+				text: '删除',
+				cls: 'info-danger-btn'
+			});
+			
+			deleteBtn.addEventListener('click', async () => {
+				const confirmed = window.confirm(
+					`确定要彻底删除 "${repo.owner}/${repo.name}" 吗？\n\n此操作将：\n1. 从本地数据库删除仓库\n2. 同步取消 GitHub 标星\n3. 同步删除关联的笔记\n\n此操作不可恢复！`
+				);
+				
+				if (!confirmed) return;
+				
+				try {
+					// 调用 GitHub API 取消标星
+					if (this.plugin.octokit) {
+						await this.plugin.octokit.request(
+							'DELETE /user/starred/{owner}/{repo}',
+							{
+								owner: repo.owner,
+								repo: repo.name,
+								headers: {
+									'X-GitHub-Api-Version': '2026-03-10',
+								},
+							}
+						);
+					}
+					
+					// 从数据库彻底删除
+					await db.hardDeleteRepo(repo.id);
+					new Notice(`已彻底删除: ${repo.owner}/${repo.name}`);
+					
+					// 刷新侧边栏并自动激活下一个仓库
+					const sidebarView = this.plugin.sidebarView;
+					if (!sidebarView) {
+						this.clearDetail();
+						return;
+					}
+
+					// 删除前记录位置
+					const currentIndex = sidebarView.filteredRepos.findIndex(r => r.id === currentRepoId);
+					
+					// 重新加载数据
+					await sidebarView.loadReposFromDB();
+					
+					// 更新仓库总数
+					const userCount = sidebarView.containerEl.querySelector('.user-count');
+					if (userCount) {
+						userCount.setText(`${sidebarView.repos.length} 个仓库`);
+					}
+					
+					// 选择下一个仓库
+					const reposAfter = sidebarView.filteredRepos.length;
+					const nextRepo = reposAfter > 0
+						? sidebarView.filteredRepos[currentIndex < reposAfter ? currentIndex : currentIndex - 1]
+						: null;
+					
+					sidebarView.renderRepoList();
+					nextRepo ? sidebarView.selectRepo(nextRepo) : this.clearDetail();
+				} catch (error: any) {
+					new Notice('删除失败: ' + (error.message || '未知错误'));
+				}
+			});
+		}
+	}
+
+	/**
+	 * 清空详情视图
+	 */
+	private clearDetail(): void {
+		this.currentRepo = null;
+		this.render();
 	}
 
 	/**

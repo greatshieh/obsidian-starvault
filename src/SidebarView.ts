@@ -35,6 +35,7 @@ export interface StarredRepo {
   tags: string[];
   isArchived: boolean;
   url: string;
+  deletedAt: number | null;
 }
 
 // 排序选项
@@ -57,12 +58,12 @@ export class StarVaultSidebarView extends ItemView {
   private sortButton: HTMLElement;
 
   // 状态
-  private repos: StarredRepo[] = [];
+  public repos: StarredRepo[] = [];
   private filteredRepos: StarredRepo[] = [];
   private activeFilter: string = '全部';
   private currentSort: SortOption = SortOption.STARS_DESC;
   private searchQuery: string = '';
-  private selectedRepoId: number | null = null;
+  public selectedRepoId: number | null = null;
   private selectedRepo: StarredRepo | null = null;
   private createNoteBtn: HTMLElement | null = null;
 
@@ -119,47 +120,52 @@ export class StarVaultSidebarView extends ItemView {
    */
   async loadReposFromDB(): Promise<void> {
     try {
-      // 确保搜索索引已构建
+      await db.open();
+      const dbRepos = await db.repos.toArray();
+
       if (!searchService.isReady()) {
         await searchService.buildIndex();
       }
 
-      // 从数据库加载所有仓库
-      const dbRepos = await db.repos.toArray();
-
       if (dbRepos.length === 0) {
-        this.repos = [];
-        this.filteredRepos = [];
-        this.renderFilters();
+        this.clearRepos();
         return;
       }
 
-      // 转换为 StarredRepo 格式
-      this.repos = dbRepos.map((repo: DBRepo) => ({
-        id: repo.id || 0,
-        owner: repo.owner || 'unknown',
-        name: repo.name || 'repo',
-        description: repo.description || '',
-        language: repo.language || 'Unknown',
-        languageColor: repo.languageColor || '#cccccc',
-        stars: repo.stars || 0,
-        forks: repo.forks || 0,
-        updatedAt: this.formatRelativeTime(new Date(repo.updatedAt || 0).toISOString()),
-        createdAt: this.formatRelativeTime(new Date(repo.createdAt || 0).toISOString()),
-        starredAt: this.formatRelativeTime(new Date(repo.syncedAt || Date.now()).toISOString()),
-        topics: repo.topics || [],
-        tags: repo.tags || [],
-        isArchived: repo.isArchived || false,
-        url: repo.htmlUrl || '',
-      }));
-
+      this.repos = dbRepos.map(this.mapDBRepoToStarredRepo.bind(this));
       this.filteredRepos = [...this.repos];
       this.renderFilters();
-    } catch (error) {
-      this.repos = [];
-      this.filteredRepos = [];
-      this.renderFilters();
+      this.applyFilters();
+    } catch {
+      this.clearRepos();
     }
+  }
+
+  private clearRepos(): void {
+    this.repos = [];
+    this.filteredRepos = [];
+    this.renderFilters();
+  }
+
+  private mapDBRepoToStarredRepo(repo: DBRepo): StarredRepo {
+    return {
+      id: repo.id || 0,
+      owner: repo.owner || 'unknown',
+      name: repo.name || 'repo',
+      description: repo.description || '',
+      language: repo.language || 'Unknown',
+      languageColor: repo.languageColor || '#cccccc',
+      stars: repo.stars || 0,
+      forks: repo.forks || 0,
+      updatedAt: this.formatRelativeTime(new Date(repo.updatedAt || 0).toISOString()),
+      createdAt: this.formatRelativeTime(new Date(repo.createdAt || 0).toISOString()),
+      starredAt: this.formatRelativeTime(new Date(repo.syncedAt || Date.now()).toISOString()),
+      topics: repo.topics || [],
+      tags: repo.tags || [],
+      isArchived: repo.isArchived || false,
+      url: repo.htmlUrl || '',
+      deletedAt: repo.deletedAt || null,
+    };
   }
 
   /**
@@ -399,7 +405,13 @@ export class StarVaultSidebarView extends ItemView {
   /**
    * 渲染仓库列表
    */
-  private renderRepoList(): void {
+  public renderRepoList(): void {
+    // 检查容器是否已初始化
+    if (!this.repoListContainer) {
+      console.log('StarVault: repoListContainer 尚未初始化，跳过渲染');
+      return;
+    }
+    
     this.repoListContainer.empty();
 
     if (this.filteredRepos.length === 0) {
@@ -417,8 +429,9 @@ export class StarVaultSidebarView extends ItemView {
    * 创建单个仓库元素
    */
   private createRepoElement(repo: StarredRepo): HTMLElement {
+    const isSoftDeleted = repo.deletedAt !== null && repo.deletedAt > 0;
     const repoEl = this.repoListContainer.createDiv(
-      `starvault-repo-item ${this.selectedRepoId === repo.id ? 'active' : ''}`
+      `starvault-repo-item ${this.selectedRepoId === repo.id ? 'active' : ''}${isSoftDeleted ? ' repo-item-deleted' : ''}`
     );
     repoEl.setAttribute('data-repo-id', repo.id.toString());
 
@@ -442,16 +455,26 @@ export class StarVaultSidebarView extends ItemView {
     langDot.style.backgroundColor = repo.languageColor;
     langDot.setAttribute('aria-label', repo.language);
 
-    // 描述
+    // 描述（显示一行，超出部分用...截断）
     if (repo.description) {
-      repoEl.createDiv({
-        text: repo.description,
+      const maxLength = 80;
+      const displayText = repo.description.length > maxLength 
+        ? repo.description.substring(0, maxLength) + '...' 
+        : repo.description;
+      const descEl = repoEl.createDiv({
+        text: displayText,
         cls: 'repo-item-desc'
       });
+      // 添加间距（上部到中部）
+      descEl.style.marginTop = '8px';
+      // 添加 title 属性，鼠标悬停时显示完整描述
+      descEl.setAttribute('title', repo.description);
     }
 
     // 元信息（Star 数、Fork 数、更新时间）
     const meta = repoEl.createDiv('repo-item-meta');
+    // 添加间距（描述到元信息）
+    meta.style.marginTop = '8px';
     
     // Star 数
     const starSpan = meta.createSpan();
@@ -464,18 +487,43 @@ export class StarVaultSidebarView extends ItemView {
     // 更新时间
     meta.createSpan({ text: repo.updatedAt });
 
-    // 标签
-    if (repo.tags.length > 0) {
+    // 标签（loadReposFromDB 中已经处理了软删除的"归档"标签，这里直接使用）
+    const tagsToDisplay = repo.tags;
+    if (tagsToDisplay.length > 0) {
       const tagsContainer = repoEl.createDiv('repo-item-tags');
-      repo.tags.forEach(tag => {
+      // 添加间距（元信息到标签）
+      tagsContainer.style.marginTop = '8px';
+      const maxTags = 3;
+      const displayTags = tagsToDisplay.slice(0, maxTags);
+      const remainingCount = tagsToDisplay.length - maxTags;
+
+      displayTags.forEach(tag => {
         const tagEl = tagsContainer.createEl('span', {
           text: tag,
-          cls: 'repo-item-tag'
+          cls: `repo-item-tag${tag === '归档' ? ' repo-item-tag-archived' : ''}`
         });
-        tagEl.style.backgroundColor = `${this.getTagColor(tag)}1a`;
-        tagEl.style.color = this.getTagColor(tag);
-        tagEl.style.border = `1px solid ${this.getTagColor(tag)}33`;
+        if (tag === '归档') {
+          tagEl.style.backgroundColor = 'rgba(150, 150, 150, 0.1)';
+          tagEl.style.color = '#999';
+          tagEl.style.border = '1px solid rgba(150, 150, 150, 0.3)';
+        } else {
+          tagEl.style.backgroundColor = `${this.getTagColor(tag)}1a`;
+          tagEl.style.color = this.getTagColor(tag);
+          tagEl.style.border = `1px solid ${this.getTagColor(tag)}33`;
+        }
       });
+
+      // 如果标签数量超过3个，显示"+x标签"
+      if (remainingCount > 0) {
+        const moreTag = tagsContainer.createEl('span', {
+          text: `+${remainingCount}标签`,
+          cls: 'repo-item-tag repo-item-tag-more'
+        });
+        moreTag.style.backgroundColor = 'rgba(100, 100, 100, 0.08)';
+        moreTag.style.color = '#666';
+        moreTag.style.border = '1px solid rgba(100, 100, 100, 0.2)';
+        moreTag.style.fontSize = '0.75em';
+      }
     }
 
     // 点击事件
@@ -519,7 +567,7 @@ export class StarVaultSidebarView extends ItemView {
   /**
    * 选择仓库
    */
-  private selectRepo(repo: StarredRepo): void {
+  public selectRepo(repo: StarredRepo): void {
     this.selectedRepoId = repo.id;
     this.selectedRepo = repo;
 
@@ -994,22 +1042,23 @@ export class StarVaultSidebarView extends ItemView {
   private async refreshRepoList(): Promise<void> {
     const dbRepos = await db.repos.toArray();
     this.repos = dbRepos.map((repo: DBRepo) => ({
-      id: repo.id,
-      owner: repo.owner,
-      name: repo.name,
-      description: repo.description,
-      language: repo.language,
-      languageColor: repo.languageColor,
-      stars: repo.stars,
-      forks: repo.forks,
-      updatedAt: new Date(repo.updatedAt).toLocaleDateString('zh-CN'),
-      createdAt: new Date(repo.createdAt).toLocaleDateString('zh-CN'),
-      starredAt: '',
-      topics: repo.topics,
-      tags: repo.tags,
-      isArchived: repo.isArchived,
-      url: repo.htmlUrl
-    }));
+        id: repo.id,
+        owner: repo.owner,
+        name: repo.name,
+        description: repo.description,
+        language: repo.language,
+        languageColor: repo.languageColor,
+        stars: repo.stars,
+        forks: repo.forks,
+        updatedAt: new Date(repo.updatedAt).toLocaleDateString('zh-CN'),
+        createdAt: new Date(repo.createdAt).toLocaleDateString('zh-CN'),
+        starredAt: '',
+        topics: repo.topics,
+        tags: (repo.deletedAt ? [...repo.tags, '归档'] : repo.tags),
+        isArchived: repo.isArchived,
+        url: repo.htmlUrl,
+        deletedAt: repo.deletedAt || null,
+      }));
     this.renderFilters();
     this.applyFilters();
 

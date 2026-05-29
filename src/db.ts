@@ -27,6 +27,7 @@ export interface DBRepo {
   syncedAt: number;              // 同步时间戳
   avatarUrl: string;             // 所有者头像
   htmlUrl: string;               // GitHub URL
+  deletedAt: number | null;     // 软删除标记（时间戳），null 表示未删除
 }
 
 /** 用户笔记 */
@@ -196,6 +197,58 @@ class StarVaultDB extends Dexie {
     repo.tags = tags;
     await this.repos.put(repo);
   }
+
+  /**
+   * 软删除仓库（标记 deletedAt 并添加归档标签）
+   */
+  async softDeleteRepo(repoId: number): Promise<void> {
+    const repo = await this.repos.get(repoId);
+    if (!repo) return;
+    repo.deletedAt = Date.now();
+    // 添加归档标签（如果不存在）
+    if (!repo.tags?.includes('归档')) {
+      repo.tags = [...(repo.tags || []), '归档'];
+    }
+    await this.repos.put(repo);
+  }
+
+  /**
+   * 硬删除仓库（彻底删除）
+   * 包括：删除仓库记录、删除仓库-标签关联、删除关联的笔记
+   */
+  async hardDeleteRepo(repoId: number): Promise<void> {
+    await this.transaction('rw', [this.repos, this.repoTags, this.notes], async () => {
+      // 1. 删除仓库-标签关联
+      await this.repoTags.where('repoId').equals(repoId).delete();
+      
+      // 2. 删除关联的笔记
+      await this.notes.where('repoId').equals(repoId).delete();
+      
+      // 3. 删除仓库记录
+      await this.repos.delete(repoId);
+    });
+  }
+
+  /**
+   * 获取已删除的仓库
+   */
+  async getDeletedRepos(): Promise<DBRepo[]> {
+    return this.repos.filter(repo => repo.deletedAt !== null && repo.deletedAt > 0).toArray();
+  }
+
+  /**
+   * 恢复已软删除的仓库
+   */
+  async restoreRepo(repoId: number): Promise<void> {
+    const repo = await this.repos.get(repoId);
+    if (!repo) return;
+    repo.deletedAt = null;
+    // 移除自动添加的"归档"标签
+    if (repo.tags && repo.tags.includes('归档')) {
+      repo.tags = repo.tags.filter(tag => tag !== '归档');
+    }
+    await this.repos.put(repo);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -230,6 +283,7 @@ export function githubRepoToDBRepo(item: any, languageColor: string): DBRepo {
     syncedAt: Date.now(),
     avatarUrl: item.owner?.avatar_url || '',
     htmlUrl: item.html_url || '',
+    deletedAt: null, // 新增字段
   };
 }
 

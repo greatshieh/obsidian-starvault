@@ -261,9 +261,9 @@ export default class StarVaultPlugin extends Plugin {
 		let totalFetched = 0;
 
 		try {
-			// 第一步：清空现有数据库（清除旧数据）
-			new Notice('正在清空旧数据...');
-			await db.repos.clear();
+			// 第一步：保存现有仓库的删除状态（以便同步后恢复）
+			const existingRepos = await db.repos.toArray();
+			const deletedRepoIds = new Set(existingRepos.filter(r => r.deletedAt).map(r => r.id));
 
 			// 第二步：从 GitHub 获取所有 starred 仓库（原始 API 数据）
 			new Notice('正在获取 GitHub Stars...');
@@ -295,16 +295,23 @@ export default class StarVaultPlugin extends Plugin {
 				page++;
 			}
 
-			// 第三步：保存到 IndexedDB
+			// 第三步：转换并恢复删除状态
 			new Notice(`正在保存 ${rawRepos.length} 个仓库到本地数据库...`);
-			const dbRepos = rawRepos.map(repo => githubRepoToDBRepo(repo, this.getLanguageColor(repo.language)));
+			const dbRepos = rawRepos.map(repo => {
+				const dbRepo = githubRepoToDBRepo(repo, this.getLanguageColor(repo.language));
+				// 如果之前是软删除状态，恢复该状态
+				if (deletedRepoIds.has(dbRepo.id)) {
+					dbRepo.deletedAt = Date.now();
+				}
+				return dbRepo;
+			});
 			await db.bulkUpsertRepos(dbRepos);
 
 			// 第四步：重建搜索索引
 			new Notice('正在构建搜索索引...');
 			await searchService.buildIndex();
 
-			// 第五步：从 IndexedDB 加载数据
+			// 第五步：从 IndexedDB 加载所有数据（包含软删除的）
 			new Notice('正在加载本地数据...');
 			const allRepos = await db.repos.toArray();
 
@@ -324,6 +331,7 @@ export default class StarVaultPlugin extends Plugin {
 				tags: repo.tags || [],
 				isArchived: repo.isArchived || false,
 				url: repo.htmlUrl || '',
+				deletedAt: repo.deletedAt || null,
 			}));
 
 			// 第六步：更新侧边栏
