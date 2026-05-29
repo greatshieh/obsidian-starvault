@@ -59,7 +59,7 @@ export class StarVaultSidebarView extends ItemView {
 
   // 状态
   public repos: StarredRepo[] = [];
-  private filteredRepos: StarredRepo[] = [];
+  public filteredRepos: StarredRepo[] = [];
   private activeFilter: string = '全部';
   private currentSort: SortOption = SortOption.STARS_DESC;
   private searchQuery: string = '';
