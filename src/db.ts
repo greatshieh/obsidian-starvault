@@ -34,12 +34,14 @@ export interface DBRepo {
 interface DBNote {
   id: string;                    // UUID（主键）
   repoId: number;                // 关联的仓库 ID
+  repoName: string;              // 仓库全名（owner/name），用于显示孤立笔记
   title: string;                 // 笔记标题
   content: string;               // 笔记内容（Markdown）
   tags: string[];                // 笔记标签
   createdAt: number;             // 创建时间戳
   updatedAt: number;             // 更新时间戳
   filePath: string | null;       // 关联的 Obsidian 文件路径
+  isOrphaned: boolean;           // 是否孤立（仓库已删除）
 }
 
 /** 自定义标签 */
@@ -179,6 +181,36 @@ class StarVaultDB extends Dexie {
   }
 
   /**
+   * 数据完整性检查
+   * 标记孤立笔记（关联的仓库不存在）
+   * 返回标记的笔记数量
+   */
+  async checkDataIntegrity(): Promise<number> {
+    let markedCount = 0;
+    
+    await this.transaction('rw', [this.repos, this.notes], async () => {
+      // 获取所有仓库 ID
+      const repos = await this.repos.toArray();
+      const validRepoIds = new Set(repos.map(r => r.id));
+      
+      // 获取所有笔记
+      const notes = await this.notes.toArray();
+      
+      // 找出孤立笔记（repoId 不存在于仓库列表中）
+      const orphanedNotes = notes.filter(note => !validRepoIds.has(note.repoId) && !note.isOrphaned);
+      
+      // 标记孤立笔记
+      for (const note of orphanedNotes) {
+        note.isOrphaned = true;
+        await this.notes.put(note);
+        markedCount++;
+      }
+    });
+    
+    return markedCount;
+  }
+
+  /**
    * 从仓库移除标签
    */
   async removeTagFromRepo(repoId: number, tag: string): Promise<void> {
@@ -214,15 +246,19 @@ class StarVaultDB extends Dexie {
 
   /**
    * 硬删除仓库（彻底删除）
-   * 包括：删除仓库记录、删除仓库-标签关联、删除关联的笔记
+   * 包括：删除仓库记录、删除仓库-标签关联、标记笔记为孤立状态
    */
   async hardDeleteRepo(repoId: number): Promise<void> {
     await this.transaction('rw', [this.repos, this.repoTags, this.notes], async () => {
       // 1. 删除仓库-标签关联
       await this.repoTags.where('repoId').equals(repoId).delete();
       
-      // 2. 删除关联的笔记
-      await this.notes.where('repoId').equals(repoId).delete();
+      // 2. 标记关联的笔记为孤立状态（保留笔记）
+      const notes = await this.notes.where('repoId').equals(repoId).toArray();
+      for (const note of notes) {
+        note.isOrphaned = true;
+        await this.notes.put(note);
+      }
       
       // 3. 删除仓库记录
       await this.repos.delete(repoId);
@@ -253,17 +289,19 @@ class StarVaultDB extends Dexie {
   /**
    * 创建笔记
    */
-  async createNote(repoId: number, title: string, content: string, filePath: string): Promise<DBNote> {
+  async createNote(repoId: number, repoName: string, title: string, content: string, filePath: string): Promise<DBNote> {
     const now = Date.now();
     const note: DBNote = {
       id: crypto.randomUUID(),
       repoId,
+      repoName,
       title,
       content,
       tags: [],
       createdAt: now,
       updatedAt: now,
       filePath,
+      isOrphaned: false,
     };
     await this.notes.put(note);
     return note;

@@ -587,8 +587,9 @@ export default class StarVaultPlugin extends Plugin {
       // 创建文件
       const file = await this.app.vault.create(fullPath, content);
       
-      // 保存笔记到数据库
-      await db.createNote(repo.id, fileName, content, fullPath);
+      // 保存笔记到数据库（包含仓库名称）
+      const repoName = `${repo.owner}/${repo.name}`;
+      await db.createNote(repo.id, repoName, fileName, content, fullPath);
       
       // 打开文件
       await this.app.workspace.getLeaf().openFile(file);
