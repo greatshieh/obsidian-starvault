@@ -4,7 +4,7 @@
  * 按照 preview.html 的样式重新设计
  */
 
-import { ItemView, WorkspaceLeaf, setIcon, Notice } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon, Notice, TFile } from 'obsidian';
 import StarVaultPlugin from './main';
 import { StarredRepo } from './SidebarView';
 import { db } from './db';
@@ -13,7 +13,8 @@ export const VIEW_TYPE_STARNEST_DETAIL = 'starvault-detail';
 
 export class StarVaultDetailView extends ItemView {
 	plugin: StarVaultPlugin;
-	private currentRepo: StarredRepo | null = null;
+	currentRepo: StarredRepo | null = null;
+	currentNotes: any[] = [];
 
 	constructor(leaf: WorkspaceLeaf, plugin: StarVaultPlugin) {
 		super(leaf);
@@ -35,8 +36,10 @@ export class StarVaultDetailView extends ItemView {
 	/**
 	 * 显示仓库详情
 	 */
-	showRepoDetail(repo: StarredRepo): void {
+	async showRepoDetail(repo: StarredRepo): Promise<void> {
 		this.currentRepo = repo;
+		// 加载该仓库的笔记
+		this.currentNotes = await db.getNotesByRepoId(repo.id);
 		this.render();
 	}
 
@@ -53,7 +56,7 @@ export class StarVaultDetailView extends ItemView {
 	/**
 	 * 渲染视图内容
 	 */
-	private render(): void {
+	public render(): void {
 		const container = this.containerEl;
 		container.empty();
 
@@ -332,6 +335,104 @@ export class StarVaultDetailView extends ItemView {
 				}
 			});
 		}
+
+		// 笔记列表卡片
+		const notesCard = sidebar.createDiv('info-card');
+		const notesHeader = notesCard.createDiv('info-card-header');
+		notesHeader.createEl('h3', { text: '笔记' });
+		const createNoteBtn = notesHeader.createEl('button', {
+			text: '+ 新建',
+			cls: 'info-edit-btn'
+		});
+		createNoteBtn.addEventListener('click', async () => {
+			await this.plugin.createRepoNoteWithTemplate(repo);
+			new Notice(`已为 ${repo.name} 创建笔记`);
+			// 重新加载笔记列表
+			this.currentNotes = await db.getNotesByRepoId(repo.id);
+			this.render();
+		});
+
+		// 显示笔记列表
+		if (this.currentNotes.length > 0) {
+			const notesList = notesCard.createDiv('notes-list');
+			for (const note of this.currentNotes) {
+				const noteItem = notesList.createDiv('note-item');
+				
+				// 左侧：笔记信息
+				const noteInfo = noteItem.createDiv('note-info');
+				noteInfo.createEl('span', {
+					text: note.title,
+					cls: 'note-title'
+				});
+				noteInfo.createEl('span', {
+					text: new Date(note.createdAt).toLocaleDateString(),
+					cls: 'note-date'
+				});
+				
+				// 右侧：操作按钮
+				const noteActions = noteItem.createDiv('note-actions');
+				
+				// 打开笔记按钮
+				const openBtn = noteActions.createEl('button', {
+					cls: 'note-action-btn note-open-btn'
+				});
+				setIcon(openBtn, 'file-text');
+				openBtn.setAttr('title', '打开笔记');
+				openBtn.addEventListener('click', async () => {
+					if (note.filePath) {
+						let file = this.plugin.app.vault.getAbstractFileByPath(note.filePath);
+						
+						// 如果文件路径失效，尝试通过标题搜索同名文件
+						if (!(file instanceof TFile)) {
+							file = await this.findNoteByTitle(note.title);
+							if (file) {
+								// 更新数据库中的路径
+								await db.updateNote(note.id, { filePath: file.path });
+								note.filePath = file.path;
+							}
+						}
+						
+						if (file instanceof TFile) {
+							await this.plugin.app.workspace.getLeaf().openFile(file);
+						} else {
+							new Notice('笔记文件不存在');
+						}
+					}
+				});
+
+				// 删除笔记按钮
+				const deleteBtn = noteActions.createEl('button', {
+					cls: 'note-action-btn note-delete-btn'
+				});
+				setIcon(deleteBtn, 'trash-2');
+				deleteBtn.setAttr('title', '删除笔记');
+				deleteBtn.addEventListener('click', async () => {
+					const confirmed = window.confirm(`确定要删除笔记 "${note.title}" 吗？`);
+					if (!confirmed) return;
+					
+					try {
+						// 从数据库删除
+						await db.deleteNote(note.id);
+						// 从文件系统中删除（如果文件存在）
+						if (note.filePath) {
+							const file = this.plugin.app.vault.getAbstractFileByPath(note.filePath);
+							if (file instanceof TFile) {
+								await this.plugin.app.vault.delete(file);
+							}
+						}
+						new Notice('笔记已删除');
+						// 重新加载笔记列表
+						this.currentNotes = await db.getNotesByRepoId(repo.id);
+						this.render();
+					} catch (error: any) {
+						new Notice('删除失败: ' + error.message);
+					}
+				});
+			}
+		} else {
+			// 如果没有笔记，显示空状态
+			notesCard.createDiv('info-empty-text').setText('暂无笔记，点击上方按钮创建');
+		}
 	}
 
 	/**
@@ -390,6 +491,18 @@ export class StarVaultDetailView extends ItemView {
 			hash = tagName.charCodeAt(i) + ((hash << 5) - hash);
 		}
 		return colors[Math.abs(hash) % colors.length] as string;
+	}
+
+	/**
+	 * 通过标题搜索笔记文件
+	 */
+	private async findNoteByTitle(title: string): Promise<TFile | null> {
+		const allFiles = this.plugin.app.vault.getFiles();
+		// 查找匹配标题的 md 文件
+		return allFiles.find(file => 
+			file.extension === 'md' && 
+			file.name.replace('.md', '') === title
+		) || null;
 	}
 
 	/**

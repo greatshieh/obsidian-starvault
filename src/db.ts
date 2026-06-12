@@ -249,6 +249,56 @@ class StarVaultDB extends Dexie {
     }
     await this.repos.put(repo);
   }
+
+  /**
+   * 创建笔记
+   */
+  async createNote(repoId: number, title: string, content: string, filePath: string): Promise<DBNote> {
+    const now = Date.now();
+    const note: DBNote = {
+      id: crypto.randomUUID(),
+      repoId,
+      title,
+      content,
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+      filePath,
+    };
+    await this.notes.put(note);
+    return note;
+  }
+
+  /**
+   * 获取仓库的所有笔记
+   */
+  async getNotesByRepoId(repoId: number): Promise<DBNote[]> {
+    return this.notes.where('repoId').equals(repoId).toArray();
+  }
+
+  /**
+   * 更新笔记
+   */
+  async updateNote(noteId: string, updates: Partial<DBNote>): Promise<void> {
+    const note = await this.notes.get(noteId);
+    if (!note) return;
+    Object.assign(note, updates, { updatedAt: Date.now() });
+    await this.notes.put(note);
+  }
+
+  /**
+   * 删除笔记
+   */
+  async deleteNote(noteId: string): Promise<void> {
+    await this.notes.delete(noteId);
+  }
+
+  /**
+   * 删除仓库的所有笔记
+   */
+  async deleteNotesByRepoId(repoId: number): Promise<void> {
+    await this.notes.where('repoId').equals(repoId).delete();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

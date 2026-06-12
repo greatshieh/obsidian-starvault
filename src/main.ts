@@ -3,7 +3,7 @@
  * Obsidian 插件主入口文件
  */
 
-import { Plugin, WorkspaceLeaf, TFile, ItemView, Notice } from 'obsidian';
+import { Plugin, WorkspaceLeaf, TFile, Notice } from 'obsidian';
 import { StarVaultSidebarView, VIEW_TYPE_STARNEST_SIDEBAR, StarredRepo } from './SidebarView';
 import { StarVaultDetailView, VIEW_TYPE_STARNEST_DETAIL } from './DetailView';
 import { StarVaultReadmeView, VIEW_TYPE_STARNEST_README } from './ReadmeView';
@@ -135,6 +135,26 @@ export default class StarVaultPlugin extends Plugin {
 
 		// 添加设置页
 		this.addSettingTab(new StarVaultSettingTab(this.app, this));
+
+		// 监听文件重命名事件，更新笔记路径
+		this.registerEvent(
+			this.app.vault.on('rename', (file, oldPath) => {
+				// 只处理 markdown 文件
+				if (file instanceof TFile && file.extension === 'md') {
+					this.updateNotePath(oldPath, file.path);
+				}
+			})
+		);
+
+		// 监听文件删除事件，清理数据库中的笔记记录
+		this.registerEvent(
+			this.app.vault.on('delete', (file) => {
+				// 只处理 markdown 文件
+				if (file instanceof TFile && file.extension === 'md') {
+					this.deleteNoteByPath(file.path);
+				}
+			})
+		);
 
 		// 如果设置了启动时同步
 		if (this.settings.syncOnStartup) {
@@ -515,59 +535,116 @@ export default class StarVaultPlugin extends Plugin {
 	}
 
 	/**
-	 * 根据模板创建仓库笔记
-	 */
-	async createRepoNoteWithTemplate(repo: StarredRepo): Promise<void> {
-		try {
-			// 解析路径和文件名模板
-			const folderPath = this.parseTemplate(this.settings.notePathTemplate, repo);
-			const fileName = this.parseTemplate(this.settings.noteNameTemplate, repo);
-			const fullPath = `${folderPath}/${fileName}.md`;
+   * 根据模板创建仓库笔记
+   */
+  async createRepoNoteWithTemplate(repo: StarredRepo): Promise<void> {
+    try {
+      // 解析路径和文件名模板
+      const folderPath = this.parseTemplate(this.settings.notePathTemplate, repo);
+      const fileName = this.parseTemplate(this.settings.noteNameTemplate, repo);
+      const fullPath = `${folderPath}/${fileName}.md`;
 
-			// 确保文件夹存在
-			await this.ensureFolderExists(folderPath);
+      // 确保文件夹存在
+      await this.ensureFolderExists(folderPath);
 
-			// 检查文件是否已存在
-			const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
-			if (existingFile) {
-				// 如果文件已存在，直接打开
-				if (existingFile instanceof TFile) {
-					await this.app.workspace.getLeaf().openFile(existingFile);
-				}
-				return;
-			}
+      // 检查文件是否已存在
+      const existingFile = this.app.vault.getAbstractFileByPath(fullPath);
+      if (existingFile) {
+        // 如果文件已存在，直接打开
+        if (existingFile instanceof TFile) {
+          await this.app.workspace.getLeaf().openFile(existingFile);
+        }
+        return;
+      }
 
-			// 准备内容模板
-			let content = this.settings.noteTemplate;
+      // 准备内容模板
+      let content = this.settings.noteTemplate;
 
-			// 处理 tags（topics）- 将数组转换为 YAML 格式的列表
-			const topicsStr = (repo.topics || []).map(topic => `  - ${topic}`).join('\n');
+      // 处理 tags（topics）- 将数组转换为 YAML 格式的列表
+      const topicsStr = (repo.topics || []).map(topic => `  - ${topic}`).join('\n');
 
-			content = content
-				.replace(/\{\{repo\}\}/g, repo.name)
-				.replace(/\{\{owner\}\}/g, repo.owner)
-				.replace(/\{\{starnumber\}\}/g, String(repo.stars))
-				.replace(/\{\{starred-at\}\}/g, repo.starredAt || '')
-				.replace(/\{\{updated_at\}\}/g, repo.updatedAt || '')
-				.replace(/\{\{created-at\}\}/g, repo.createdAt || '')
-				.replace(/\{\{language\}\}/g, repo.language || '')
-				.replace(/\{\{tags\}\}/g, topicsStr)
-				.replace(/\{\{url\}\}/g, repo.url || `https://github.com/${repo.owner}/${repo.name}`)
-				.replace(/\{\{repo\.name\}\}/g, repo.name)
-				.replace(/\{\{repo\.owner\}\}/g, repo.owner)
-				.replace(/\{\{repo\.description\}\}/g, repo.description || '')
-				.replace(/\{\{repo\.language\}\}/g, repo.language || '')
-				.replace(/\{\{repo\.stars\}\}/g, String(repo.stars))
-				.replace(/\{\{repo\.forks\}\}/g, String(repo.forks))
-				.replace(/\{\{repo\.url\}\}/g, repo.url || `https://github.com/${repo.owner}/${repo.name}`)
-				.replace(/\{\{repo\.createdAt\}\}/g, repo.createdAt || '')
-				.replace(/\{\{repo\.updatedAt\}\}/g, repo.updatedAt || '')
-				.replace(/\{\{repo\.starredAt\}\}/g, repo.starredAt || '');
+      content = content
+        .replace(/\{\{repo\}\}/g, repo.name)
+        .replace(/\{\{owner\}\}/g, repo.owner)
+        .replace(/\{\{starnumber\}\}/g, String(repo.stars))
+        .replace(/\{\{starred-at\}\}/g, repo.starredAt || '')
+        .replace(/\{\{updated_at\}\}/g, repo.updatedAt || '')
+        .replace(/\{\{created-at\}\}/g, repo.createdAt || '')
+        .replace(/\{\{language\}\}/g, repo.language || '')
+        .replace(/\{\{tags\}\}/g, topicsStr)
+        .replace(/\{\{url\}\}/g, repo.url || `https://github.com/${repo.owner}/${repo.name}`)
+        .replace(/\{\{repo\.name\}\}/g, repo.name)
+        .replace(/\{\{repo\.owner\}\}/g, repo.owner)
+        .replace(/\{\{repo\.description\}\}/g, repo.description || '')
+        .replace(/\{\{repo\.language\}\}/g, repo.language || '')
+        .replace(/\{\{repo\.stars\}\}/g, String(repo.stars))
+        .replace(/\{\{repo\.forks\}\}/g, String(repo.forks))
+        .replace(/\{\{repo\.url\}\}/g, repo.url || `https://github.com/${repo.owner}/${repo.name}`)
+        .replace(/\{\{repo\.createdAt\}\}/g, repo.createdAt || '')
+        .replace(/\{\{repo\.updatedAt\}\}/g, repo.updatedAt || '')
+        .replace(/\{\{repo\.starredAt\}\}/g, repo.starredAt || '');
 
-			// 创建文件
-			const file = await this.app.vault.create(fullPath, content);
-			await this.app.workspace.getLeaf().openFile(file);
-		} catch (error) {
-		}
-	}
+      // 创建文件
+      const file = await this.app.vault.create(fullPath, content);
+      
+      // 保存笔记到数据库
+      await db.createNote(repo.id, fileName, content, fullPath);
+      
+      // 打开文件
+      await this.app.workspace.getLeaf().openFile(file);
+    } catch (error: any) {
+      new Notice('创建笔记失败: ' + (error.message || '未知错误'));
+    }
+  }
+
+  /**
+   * 更新笔记路径（当文件重命名时）
+   */
+  private async updateNotePath(oldPath: string, newPath: string): Promise<void> {
+    try {
+      // 查找数据库中匹配旧路径的笔记
+      const notes = await db.notes.toArray();
+      const note = notes.find(n => n.filePath === oldPath);
+      
+      if (note) {
+        // 更新路径和标题（从新文件名提取）
+        const newFileName = newPath.split('/').pop()?.replace('.md', '') || note.title;
+        await db.updateNote(note.id, {
+          filePath: newPath,
+          title: newFileName,
+        });
+        
+        // 如果右侧边栏正在显示这个仓库的详情，刷新笔记列表
+        if (this.detailView && this.detailView.currentRepo?.id === note.repoId) {
+          this.detailView.currentNotes = await db.getNotesByRepoId(note.repoId);
+          this.detailView.render();
+        }
+      }
+    } catch (error) {
+      // 静默失败，不影响用户体验
+    }
+  }
+
+  /**
+   * 删除笔记记录（当文件被删除时）
+   */
+  private async deleteNoteByPath(path: string): Promise<void> {
+    try {
+      // 查找数据库中匹配路径的笔记
+      const notes = await db.notes.toArray();
+      const note = notes.find(n => n.filePath === path);
+      
+      if (note) {
+        await db.deleteNote(note.id);
+        
+        // 如果右侧边栏正在显示这个仓库的详情，刷新笔记列表
+        if (this.detailView && this.detailView.currentRepo?.id === note.repoId) {
+          this.detailView.currentNotes = await db.getNotesByRepoId(note.repoId);
+          this.detailView.render();
+        }
+      }
+    } catch (error) {
+      // 静默失败，不影响用户体验
+    }
+  }
 }
