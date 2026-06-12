@@ -261,9 +261,19 @@ export default class StarVaultPlugin extends Plugin {
 		let totalFetched = 0;
 
 		try {
-			// 第一步：保存现有仓库的删除状态（以便同步后恢复）
+			// 第一步：保存现有仓库的自定义数据（标签和删除状态）
 			const existingRepos = await db.repos.toArray();
-			const deletedRepoIds = new Set(existingRepos.filter(r => r.deletedAt).map(r => r.id));
+			const existingDataMap = new Map<number, {
+				tags: string[];
+				deletedAt: number | null;
+			}>();
+
+			existingRepos.forEach(repo => {
+				existingDataMap.set(repo.id, {
+					tags: repo.tags || [],
+					deletedAt: repo.deletedAt,
+				});
+			});
 
 			// 第二步：从 GitHub 获取所有 starred 仓库（原始 API 数据）
 			new Notice('正在获取 GitHub Stars...');
@@ -295,13 +305,15 @@ export default class StarVaultPlugin extends Plugin {
 				page++;
 			}
 
-			// 第三步：转换并恢复删除状态
+			// 第三步：转换并合并自定义数据
 			new Notice(`正在保存 ${rawRepos.length} 个仓库到本地数据库...`);
 			const dbRepos = rawRepos.map(repo => {
 				const dbRepo = githubRepoToDBRepo(repo, this.getLanguageColor(repo.language));
-				// 如果之前是软删除状态，恢复该状态
-				if (deletedRepoIds.has(dbRepo.id)) {
-					dbRepo.deletedAt = Date.now();
+				// 合并现有自定义数据（保留用户标签和删除状态）
+				const existingData = existingDataMap.get(dbRepo.id);
+				if (existingData) {
+					dbRepo.tags = existingData.tags;
+					dbRepo.deletedAt = existingData.deletedAt;
 				}
 				return dbRepo;
 			});
