@@ -1,7 +1,7 @@
 /**
  * StarVaultDetailView.ts
  * 右侧边栏视图 - 用于显示仓库详情
- * 按照 preview.html 的样式重新设计
+ * 折叠面板样式
  */
 
 import { ItemView, WorkspaceLeaf, setIcon, Notice, TFile, Modal } from 'obsidian';
@@ -15,6 +15,9 @@ export class StarVaultDetailView extends ItemView {
 	plugin: StarVaultPlugin;
 	currentRepo: StarredRepo | null = null;
 	currentNotes: any[] = [];
+	
+	// 折叠状态管理
+	collapsedSections: Set<string> = new Set();
 
 	constructor(leaf: WorkspaceLeaf, plugin: StarVaultPlugin) {
 		super(leaf);
@@ -31,6 +34,80 @@ export class StarVaultDetailView extends ItemView {
 
 	getIcon(): string {
 		return 'info';
+	}
+
+	/**
+	 * 切换折叠状态
+	 */
+	private toggleCollapse(sectionId: string, contentEl: HTMLElement, arrowEl: HTMLElement): void {
+		if (this.collapsedSections.has(sectionId)) {
+			this.collapsedSections.delete(sectionId);
+			contentEl.removeClass('collapsed');
+			arrowEl.addClass('expanded');
+		} else {
+			this.collapsedSections.add(sectionId);
+			contentEl.addClass('collapsed');
+			arrowEl.removeClass('expanded');
+		}
+	}
+
+	/**
+	 * 创建折叠面板
+	 */
+	private createCollapsePanel(
+		parent: HTMLElement,
+		sectionId: string,
+		title: string,
+		contentGenerator: (content: HTMLElement) => void,
+		options?: { defaultCollapsed?: boolean; actions?: (header: HTMLElement) => void }
+	): void {
+		const card = parent.createDiv('collapse-card');
+		
+		// 面板头部
+		const header = card.createDiv('collapse-header');
+		header.setAttribute('data-section', sectionId);
+		
+		// 左侧区域（箭头+标题）
+		const headerLeft = header.createDiv('collapse-header-left');
+		
+		// 箭头图标
+		const arrow = headerLeft.createDiv('collapse-arrow');
+		setIcon(arrow, 'chevron-right');
+		arrow.addClass('expanded');
+		
+		// 标题
+		headerLeft.createEl('h3', {
+			text: title,
+			cls: 'collapse-title'
+		});
+		
+		// 右侧操作区域
+		if (options?.actions) {
+			const actionsArea = header.createDiv('collapse-actions');
+			options.actions(actionsArea);
+		}
+		
+		// 面板内容
+		const content = card.createDiv('collapse-content');
+		
+		// 生成内容
+		contentGenerator(content);
+		
+		// 默认展开
+		if (options?.defaultCollapsed) {
+			this.collapsedSections.add(sectionId);
+			content.addClass('collapsed');
+			arrow.removeClass('expanded');
+		}
+		
+		// 点击头部切换折叠状态
+		header.addEventListener('click', (e) => {
+			// 如果点击的是操作按钮区域，不触发折叠
+			const target = e.target as HTMLElement;
+			if (target.closest('.collapse-actions')) return;
+			
+			this.toggleCollapse(sectionId, content, arrow);
+		});
 	}
 
 	/**
@@ -72,540 +149,522 @@ export class StarVaultDetailView extends ItemView {
 
 		// Description 卡片
 		if (repo.description) {
-			const descCard = sidebar.createDiv('info-card');
-			descCard.createEl('h3', { text: '描述' });
-			descCard.createDiv('info-description').setText(repo.description);
+			this.createCollapsePanel(sidebar, 'description', '描述', (content) => {
+				content.createDiv('info-description').setText(repo.description);
+			});
 		}
 
 		// Topics 卡片
 		if (repo.topics && repo.topics.length > 0) {
-			const topicsCard = sidebar.createDiv('info-card');
-			topicsCard.createEl('h3', { text: 'Topics' });
-			const topicsContainer = topicsCard.createDiv('info-tags');
-			repo.topics.forEach((topic: string) => {
-				topicsContainer.createEl('span', {
-					text: topic,
-					cls: 'info-tag'
+			this.createCollapsePanel(sidebar, 'topics', 'Topics', (content) => {
+				const topicsContainer = content.createDiv('info-tags');
+				repo.topics.forEach((topic: string) => {
+					topicsContainer.createEl('span', {
+						text: topic,
+						cls: 'info-tag'
+					});
 				});
 			});
 		}
 
 		// 仓库信息卡片
-		const infoCard = sidebar.createDiv('info-card');
-		infoCard.createEl('h3', { text: '仓库信息' });
-
-		infoCard.createDiv('info-row').innerHTML = `<span class="label">创建时间</span><span class="value">${repo.createdAt || '-'}</span>`;
-		infoCard.createDiv('info-row').innerHTML = `<span class="label">最后推送</span><span class="value">${repo.updatedAt || '-'}</span>`;
-		infoCard.createDiv('info-row').innerHTML = `<span class="label">Star 数量</span><span class="value accent">${this.formatNumber(repo.stars)}</span>`;
-		infoCard.createDiv('info-row').innerHTML = `<span class="label">Fork 数量</span><span class="value">${this.formatNumber(repo.forks)}</span>`;
-
-		if (repo.language) {
-			infoCard.createDiv('info-row').innerHTML = `<span class="label">语言</span><span class="value"><span class="lang-dot" style="background: ${repo.languageColor}"></span>${repo.language}</span>`;
-		}
-
-		if (repo.isArchived) {
-			infoCard.createDiv('info-row').innerHTML = `<span class="label">状态</span><span class="value">⚠️ 已归档</span>`;
-		}
+		this.createCollapsePanel(sidebar, 'info', '仓库信息', (content) => {
+			content.createDiv('info-row').innerHTML = `<span class="label">创建时间</span><span class="value">${repo.createdAt || '-'}</span>`;
+			content.createDiv('info-row').innerHTML = `<span class="label">最后推送</span><span class="value">${repo.updatedAt || '-'}</span>`;
+			content.createDiv('info-row').innerHTML = `<span class="label">Star 数量</span><span class="value accent">${this.formatNumber(repo.stars)}</span>`;
+			content.createDiv('info-row').innerHTML = `<span class="label">Fork 数量</span><span class="value">${this.formatNumber(repo.forks)}</span>`;
+			
+			if (repo.language) {
+				content.createDiv('info-row').innerHTML = `<span class="label">语言</span><span class="value"><span class="lang-dot" style="background: ${repo.languageColor}"></span>${repo.language}</span>`;
+			}
+			
+			if (repo.isArchived) {
+				content.createDiv('info-row').innerHTML = `<span class="label">状态</span><span class="value warning">⚠️ 已归档</span>`;
+			}
+		});
 
 		// 自定义标签卡片
 		if (repo.tags && repo.tags.length > 0) {
-			const tagsCard = sidebar.createDiv('info-card');
-			const tagsHeader = tagsCard.createDiv('info-card-header');
-			tagsHeader.createEl('h3', { text: '自定义标签' });
-			const editBtn = tagsHeader.createEl('button', {
-				text: '编辑',
-				cls: 'info-edit-btn'
-			});
-			editBtn.addEventListener('click', () => {
-				const sidebarView = this.app.workspace.getLeavesOfType('starvault-sidebar')[0];
-				if (sidebarView) {
-					const view = sidebarView.view as any;
-					if (view && view.openTagEditor) {
-						view.openTagEditor(repo);
-					}
-				}
-			});
-			const tagsContainer = tagsCard.createDiv('info-tags');
-			repo.tags.forEach((tag: string) => {
-				const tagEl = tagsContainer.createEl('span', {
-					text: tag,
-					cls: 'info-tag'
+			this.createCollapsePanel(sidebar, 'tags', '自定义标签', (content) => {
+				const tagsContainer = content.createDiv('info-tags');
+				repo.tags.forEach((tag: string) => {
+					const tagEl = tagsContainer.createEl('span', {
+						text: tag,
+						cls: 'info-tag'
+					});
+					tagEl.style.backgroundColor = `${this.getTagColor(tag)}1a`;
+					tagEl.style.color = this.getTagColor(tag);
+					tagEl.style.border = `1px solid ${this.getTagColor(tag)}33`;
 				});
-				tagEl.style.backgroundColor = `${this.getTagColor(tag)}1a`;
-				tagEl.style.color = this.getTagColor(tag);
-				tagEl.style.border = `1px solid ${this.getTagColor(tag)}33`;
+			}, {
+				actions: (actions) => {
+					const editBtn = actions.createEl('button', {
+						cls: 'info-edit-btn'
+					});
+					setIcon(editBtn, 'pencil');
+					editBtn.setAttr('title', '编辑标签');
+					editBtn.addEventListener('click', () => {
+						const sidebarView = this.app.workspace.getLeavesOfType('starvault-sidebar')[0];
+						if (sidebarView) {
+							const view = sidebarView.view as any;
+							if (view && view.openTagEditor) {
+								view.openTagEditor(repo);
+							}
+						}
+					});
+				}
 			});
 		} else {
-			// 如果没有标签，显示添加按钮
-			const tagsCard = sidebar.createDiv('info-card');
-			const tagsHeader = tagsCard.createDiv('info-card-header');
-			tagsHeader.createEl('h3', { text: '自定义标签' });
-			const addBtn = tagsHeader.createEl('button', {
-				text: '添加',
-				cls: 'info-edit-btn'
-			});
-			addBtn.addEventListener('click', () => {
-				const sidebarView = this.app.workspace.getLeavesOfType('starvault-sidebar')[0];
-				if (sidebarView) {
-					const view = sidebarView.view as any;
-					if (view && view.openTagEditor) {
-						view.openTagEditor(repo);
-					}
+			this.createCollapsePanel(sidebar, 'tags', '自定义标签', (content) => {
+				content.createDiv('info-empty-text').setText('暂无标签');
+			}, {
+				actions: (actions) => {
+					const addBtn = actions.createEl('button', {
+						cls: 'info-edit-btn'
+					});
+					setIcon(addBtn, 'plus');
+					addBtn.setAttr('title', '添加标签');
+					addBtn.addEventListener('click', () => {
+						const sidebarView = this.app.workspace.getLeavesOfType('starvault-sidebar')[0];
+						if (sidebarView) {
+							const view = sidebarView.view as any;
+							if (view && view.openTagEditor) {
+								view.openTagEditor(repo);
+							}
+						}
+					});
 				}
 			});
-			tagsCard.createDiv('info-empty-text').setText('暂无标签');
 		}
 
 		// 链接卡片
-		const linkCard = sidebar.createDiv('info-card');
-		linkCard.createEl('h3', { text: '链接' });
+		this.createCollapsePanel(sidebar, 'links', '链接', (content) => {
+			content.createEl('a', {
+				text: '在 Github 查看',
+				cls: 'info-link',
+				href: '#'
+			}).addEventListener('click', async (e) => {
+				e.preventDefault();
+				const url = `https://github.com/${repo.owner}/${repo.name}`;
+				window.open(url, '_blank');
+			});
 
-		linkCard.createEl('a', {
-			text: '在 Github 查看',
-			cls: 'info-link',
-			href: '#'
-		}).addEventListener('click', async (e) => {
-			e.preventDefault();
-			const url = `https://github.com/${repo.owner}/${repo.name}`;
-			window.open(url, '_blank');
-		});
+			content.createEl('a', {
+				text: '在 Zread 查看',
+				cls: 'info-link',
+				href: '#'
+			}).addEventListener('click', async (e) => {
+				e.preventDefault();
+				const url = `https://zread.ai/${repo.owner}/${repo.name}`;
+				window.open(url, '_blank');
+			});
 
-		linkCard.createEl('a', {
-			text: '在 Zread 查看',
-			cls: 'info-link',
-			href: '#'
-		}).addEventListener('click', async (e) => {
-			e.preventDefault();
-			const url = `https://zread.ai/${repo.owner}/${repo.name}`;
-			window.open(url, '_blank');
-		});
+			content.createEl('a', {
+				text: '在 DeepWiKi 查看',
+				cls: 'info-link',
+				href: '#'
+			}).addEventListener('click', async (e) => {
+				e.preventDefault();
+				const url = `https://deepiki.com/${repo.owner}/${repo.name}`;
+				window.open(url, '_blank');
+			});
 
-		linkCard.createEl('a', {
-			text: '在 DeepWiKi 查看',
-			cls: 'info-link',
-			href: '#'
-		}).addEventListener('click', async (e) => {
-			e.preventDefault();
-			const url = `https://deepiki.com/${repo.owner}/${repo.name}`;
-			window.open(url, '_blank');
-		});
+			content.createEl('a', {
+				text: '复制 Clone URL',
+				cls: 'info-link',
+				href: '#'
+			}).addEventListener('click', (e) => {
+				e.preventDefault();
+				navigator.clipboard.writeText(`https://github.com/${repo.owner}/${repo.name}.git`);
+				new Notice('已复制到剪贴板');
+			});
 
-
-		linkCard.createEl('a', {
-			text: '复制 Clone URL',
-			cls: 'info-link',
-			href: '#'
-		}).addEventListener('click', (e) => {
-			e.preventDefault();
-			navigator.clipboard.writeText(`https://github.com/${repo.owner}/${repo.name}.git`);
-			new Notice('已复制到剪贴板');
-		});
-
-		// 取消标星/恢复/删除按钮
-		const isSoftDeleted = repo.deletedAt !== null && repo.deletedAt > 0;
-		const currentRepoId = repo.id;
-		
-		if (!isSoftDeleted) {
-			// 未删除状态：显示取消标星按钮
-			const cancelStarBtn = linkCard.createEl('button', {
-				text: '取消标星',
-				cls: 'info-link'
-			});
+			// 取消标星/恢复/删除按钮
+			const isSoftDeleted = repo.deletedAt !== null && repo.deletedAt > 0;
+			const currentRepoId = repo.id;
 			
-			cancelStarBtn.addEventListener('click', async () => {
-				try {
-					await db.softDeleteRepo(repo.id);
-					new Notice(`已取消标星: ${repo.owner}/${repo.name}`);
-					// 刷新侧边栏 - 统一从数据库重新加载并保持选中状态
-					if (this.plugin.sidebarView) {
-						await this.plugin.sidebarView.loadReposFromDB();
-						// 先设置选中状态，再渲染，最后触发选中事件更新详情
-						this.plugin.sidebarView.selectedRepoId = currentRepoId;
-						this.plugin.sidebarView.renderRepoList();
-						const updatedRepo = this.plugin.sidebarView.repos.find(r => r.id === currentRepoId);
-						if (updatedRepo) {
-							this.plugin.sidebarView.selectRepo(updatedRepo);
-						}
-					}
-				} catch (error: any) {
-					new Notice('操作失败: ' + error.message);
-				}
-			});
-		} else {
-			// 软删除状态：显示恢复和删除按钮
-			const restoreBtn = linkCard.createEl('button', {
-				text: '恢复',
-				cls: 'info-restore-btn'
-			});
-			
-			restoreBtn.addEventListener('click', async () => {
-				try {
-					await db.restoreRepo(repo.id);
-					new Notice(`已恢复标星: ${repo.owner}/${repo.name}`);
-					// 刷新侧边栏并保持选中状态
-					if (this.plugin.sidebarView) {
-						await this.plugin.sidebarView.loadReposFromDB();
-						// 先设置选中状态，再渲染，最后触发选中事件更新详情
-						this.plugin.sidebarView.selectedRepoId = currentRepoId;
-						this.plugin.sidebarView.renderRepoList();
-						const updatedRepo = this.plugin.sidebarView.repos.find(r => r.id === currentRepoId);
-						if (updatedRepo) {
-							this.plugin.sidebarView.selectRepo(updatedRepo);
-						}
-					}
-				} catch (error: any) {
-					new Notice('恢复失败: ' + error.message);
-				}
-			});
-			
-			const deleteBtn = linkCard.createEl('button', {
-				text: '删除',
-				cls: 'info-danger-btn'
-			});
-			
-			deleteBtn.addEventListener('click', async () => {
-				const confirmed = window.confirm(
-					`确定要彻底删除 "${repo.owner}/${repo.name}" 吗？\n\n此操作将：\n1. 从本地数据库删除仓库\n2. 同步取消 GitHub 标星\n3. 同步删除关联的笔记\n\n此操作不可恢复！`
-				);
-				
-				if (!confirmed) return;
-				
-				try {
-					// 调用 GitHub API 取消标星
-					if (this.plugin.octokit) {
-						await this.plugin.octokit.request(
-							'DELETE /user/starred/{owner}/{repo}',
-							{
-								owner: repo.owner,
-								repo: repo.name,
-								headers: {
-									'X-GitHub-Api-Version': '2026-03-10',
-								},
-							}
-						);
-					}
-					
-					// 从数据库彻底删除
-					await db.hardDeleteRepo(repo.id);
-					new Notice(`已彻底删除: ${repo.owner}/${repo.name}`);
-					
-					// 刷新侧边栏并自动激活下一个仓库
-					const sidebarView = this.plugin.sidebarView;
-					if (!sidebarView) {
-						this.clearDetail();
-						return;
-					}
-
-					// 删除前记录位置
-					const currentIndex = sidebarView.filteredRepos.findIndex(r => r.id === currentRepoId);
-					
-					// 重新加载数据
-					await sidebarView.loadReposFromDB();
-					
-					// 更新仓库总数
-					const userCount = sidebarView.containerEl.querySelector('.user-count');
-					if (userCount) {
-						userCount.setText(`${sidebarView.repos.length} 个仓库`);
-					}
-					
-					// 选择下一个仓库
-					const reposAfter = sidebarView.filteredRepos.length;
-					const nextRepo = reposAfter > 0
-						? sidebarView.filteredRepos[currentIndex < reposAfter ? currentIndex : currentIndex - 1]
-						: null;
-					
-					sidebarView.renderRepoList();
-					nextRepo ? sidebarView.selectRepo(nextRepo) : this.clearDetail();
-				} catch (error: any) {
-					new Notice('删除失败: ' + (error.message || '未知错误'));
-				}
-			});
-		}
-
-		// 笔记列表卡片
-		const notesCard = sidebar.createDiv('info-card');
-		const notesHeader = notesCard.createDiv('info-card-header');
-		notesHeader.createEl('h3', { text: '笔记' });
-		
-		// 笔记操作按钮组
-		const notesActions = notesHeader.createDiv('notes-actions');
-		
-		// 新建笔记按钮
-		const createNoteBtn = notesActions.createEl('button', {
-			text: '+ 新建',
-			cls: 'info-edit-btn'
-		});
-		createNoteBtn.addEventListener('click', async () => {
-			await this.plugin.createRepoNoteWithTemplate(repo);
-			new Notice(`已为 ${repo.name} 创建笔记`);
-			// 重新加载笔记列表
-			this.currentNotes = await db.getNotesByRepoId(repo.id);
-			this.render();
-		});
-
-		// 关联已有笔记按钮
-		const linkNoteBtn = notesActions.createEl('button', {
-			text: '关联',
-			cls: 'info-edit-btn'
-		});
-		linkNoteBtn.setAttr('title', '关联已有笔记');
-		linkNoteBtn.addEventListener('click', async () => {
-			// 获取当前仓库已关联的笔记文件路径
-			const linkedPaths = new Set(this.currentNotes.map(note => note.filePath).filter(Boolean));
-			
-			// 获取所有 Markdown 文件，排除已关联的
-			const allFiles = this.plugin.app.vault.getFiles();
-			const mdFiles = allFiles.filter(
-				file => file instanceof TFile && 
-				        file.extension === 'md' && 
-				        !linkedPaths.has(file.path)
-			);
-			
-			if (mdFiles.length === 0) {
-				new Notice('没有可关联的笔记（已全部关联或没有其他笔记）');
-				return;
-			}
-			
-			// 创建自定义文件选择弹窗
-			const modal = new Modal(this.plugin.app);
-			modal.titleEl.setText('选择要关联的笔记');
-			
-			// 创建文件列表容器
-			const container = modal.contentEl.createDiv('note-select-container');
-			container.addClass('starvault-note-select');
-			
-			// 创建搜索框
-			const searchWrapper = container.createDiv('note-search-wrapper');
-			const searchInput = searchWrapper.createEl('input', {
-				type: 'text',
-				placeholder: '输入关键字搜索笔记...',
-				cls: 'note-search-input'
-			});
-			
-			// 创建已选计数显示
-			const selectedCountEl = container.createDiv('note-selected-count');
-			selectedCountEl.setText('已选择 0 个');
-			
-			// 创建文件列表
-			const list = container.createEl('div', 'note-select-list');
-			
-			// 选中的文件路径集合
-			const selectedPaths = new Set<string>();
-			
-			// 渲染文件列表的函数
-			const renderFiles = (files: TFile[]) => {
-				list.empty();  // 清空列表
-				selectedPaths.clear();  // 清空选择
-				updateSelectedCount();
-				
-				if (files.length === 0) {
-					list.createDiv('note-select-empty').setText('没有找到匹配的笔记');
-					return;
-				}
-				
-				for (const file of files) {
-					const item = list.createEl('div', 'note-select-item');
-					
-					// 创建复选框
-					const checkbox = item.createEl('input', {
-						type: 'checkbox',
-						cls: 'note-item-checkbox'
-					});
-					checkbox.setAttribute('data-path', file.path);
-					
-					// 文件路径文本
-					item.createEl('span', {
-						text: file.path,
-						cls: 'note-item-text'
-					});
-					
-					// 点击整行或复选框都能选中
-					const toggleSelection = (e: Event) => {
-						const target = e.target as HTMLElement;
-						if (target === checkbox) {
-							checkbox.checked = !checkbox.checked;
-						}
-						
-						if (checkbox.checked) {
-							selectedPaths.add(file.path);
-						} else {
-							selectedPaths.delete(file.path);
-						}
-						updateSelectedCount();
-					};
-					
-					item.addEventListener('click', toggleSelection);
-					checkbox.addEventListener('click', toggleSelection);
-				}
-			};
-			
-			// 更新已选计数
-			const updateSelectedCount = () => {
-				const count = selectedPaths.size;
-				selectedCountEl.setText(`已选择 ${count} 个`);
-				confirmBtn.disabled = count === 0;
-			};
-			
-			// 创建底部按钮区域
-			const buttonArea = container.createDiv('note-button-area');
-			
-			// 全选按钮
-			const selectAllBtn = buttonArea.createEl('button', {
-				text: '全选',
-				cls: 'note-btn note-btn-secondary'
-			});
-			selectAllBtn.addEventListener('click', () => {
-				list.querySelectorAll('.note-item-checkbox').forEach((cb) => {
-					const checkbox = cb as HTMLInputElement;
-					checkbox.checked = true;
-					const path = checkbox.getAttribute('data-path');
-					if (path) selectedPaths.add(path);
-				});
-				updateSelectedCount();
-			});
-			
-			// 取消全选按钮
-			const deselectAllBtn = buttonArea.createEl('button', {
-				text: '取消全选',
-				cls: 'note-btn note-btn-secondary'
-			});
-			deselectAllBtn.addEventListener('click', () => {
-				list.querySelectorAll('.note-item-checkbox').forEach((cb) => {
-					const checkbox = cb as HTMLInputElement;
-					checkbox.checked = false;
-				});
-				selectedPaths.clear();
-				updateSelectedCount();
-			});
-			
-			// 确认关联按钮
-			const confirmBtn = buttonArea.createEl('button', {
-				text: '确认关联',
-				cls: 'note-btn note-btn-primary'
-			});
-			confirmBtn.disabled = true;
-			confirmBtn.addEventListener('click', async () => {
-				if (selectedPaths.size === 0) return;
-				
-				modal.close();
-				
-				// 批量关联笔记
-				const repoName = `${repo.owner}/${repo.name}`;
-				let successCount = 0;
-				
-				for (const filePath of selectedPaths) {
-					const note = await db.linkNote(repo.id, repoName, filePath);
-					if (note) successCount++;
-				}
-				
-				new Notice(`已关联 ${successCount} 个笔记`);
-				// 重新加载笔记列表
-				this.currentNotes = await db.getNotesByRepoId(repo.id);
-				this.render();
-			});
-			
-			// 监听搜索输入，实时过滤
-			searchInput.addEventListener('input', () => {
-				const keyword = searchInput.value.toLowerCase().trim();
-				if (keyword) {
-					const filtered = mdFiles.filter(file => 
-						file.path.toLowerCase().includes(keyword)
-					);
-					renderFiles(filtered);
-				} else {
-					renderFiles(mdFiles);
-				}
-			});
-			
-			// 初始渲染所有文件
-			renderFiles(mdFiles);
-			
-			modal.open();
-			// 自动聚焦到搜索框
-			setTimeout(() => searchInput.focus(), 100);
-		});
-
-		// 显示笔记列表
-		if (this.currentNotes.length > 0) {
-			const notesList = notesCard.createDiv('notes-list');
-			for (const note of this.currentNotes) {
-				const noteItem = notesList.createDiv('note-item');
-				
-				// 左侧：笔记信息
-				const noteInfo = noteItem.createDiv('note-info');
-				noteInfo.createEl('span', {
-					text: note.title,
-					cls: 'note-title'
-				});
-				noteInfo.createEl('span', {
-					text: new Date(note.createdAt).toLocaleDateString(),
-					cls: 'note-date'
+			if (!isSoftDeleted) {
+				// 未删除状态：显示取消标星按钮
+				const cancelStarBtn = content.createEl('button', {
+					text: '取消标星',
+					cls: 'info-link'
 				});
 				
-				// 右侧：操作按钮
-				const noteActions = noteItem.createDiv('note-actions');
-				
-				// 打开笔记按钮
-				const openBtn = noteActions.createEl('button', {
-					cls: 'note-action-btn note-open-btn'
-				});
-				setIcon(openBtn, 'file-text');
-				openBtn.setAttr('title', '打开笔记');
-				openBtn.addEventListener('click', async () => {
-					if (note.filePath) {
-						let file = this.plugin.app.vault.getAbstractFileByPath(note.filePath);
-						
-						// 如果文件路径失效，尝试通过标题搜索同名文件
-						if (!(file instanceof TFile)) {
-							file = await this.findNoteByTitle(note.title);
-							if (file) {
-								// 更新数据库中的路径
-								await db.updateNote(note.id, { filePath: file.path });
-								note.filePath = file.path;
+				cancelStarBtn.addEventListener('click', async () => {
+					try {
+						await db.softDeleteRepo(repo.id);
+						new Notice(`已取消标星: ${repo.owner}/${repo.name}`);
+						if (this.plugin.sidebarView) {
+							await this.plugin.sidebarView.loadReposFromDB();
+							this.plugin.sidebarView.selectedRepoId = currentRepoId;
+							this.plugin.sidebarView.renderRepoList();
+							const updatedRepo = this.plugin.sidebarView.repos.find(r => r.id === currentRepoId);
+							if (updatedRepo) {
+								this.plugin.sidebarView.selectRepo(updatedRepo);
 							}
 						}
-						
-						if (file instanceof TFile) {
-							await this.plugin.app.workspace.getLeaf().openFile(file);
-						} else {
-							new Notice('笔记文件不存在');
-						}
+					} catch (error: any) {
+						new Notice('操作失败: ' + error.message);
 					}
 				});
-
-				// 删除笔记按钮
-				const deleteBtn = noteActions.createEl('button', {
-					cls: 'note-action-btn note-delete-btn'
+			} else {
+				// 软删除状态：显示恢复和删除按钮
+				const restoreBtn = content.createEl('button', {
+					text: '恢复',
+					cls: 'info-restore-btn'
 				});
-				setIcon(deleteBtn, 'trash-2');
-				deleteBtn.setAttr('title', '删除笔记');
+				
+				restoreBtn.addEventListener('click', async () => {
+					try {
+						await db.restoreRepo(repo.id);
+						new Notice(`已恢复标星: ${repo.owner}/${repo.name}`);
+						if (this.plugin.sidebarView) {
+							await this.plugin.sidebarView.loadReposFromDB();
+							this.plugin.sidebarView.selectedRepoId = currentRepoId;
+							this.plugin.sidebarView.renderRepoList();
+							const updatedRepo = this.plugin.sidebarView.repos.find(r => r.id === currentRepoId);
+							if (updatedRepo) {
+								this.plugin.sidebarView.selectRepo(updatedRepo);
+							}
+						}
+					} catch (error: any) {
+						new Notice('恢复失败: ' + error.message);
+					}
+				});
+				
+				const deleteBtn = content.createEl('button', {
+					text: '删除',
+					cls: 'info-danger-btn'
+				});
+				
 				deleteBtn.addEventListener('click', async () => {
-					const confirmed = window.confirm(`确定要删除笔记 "${note.title}" 吗？`);
+					const confirmed = window.confirm(
+						`确定要彻底删除 "${repo.owner}/${repo.name}" 吗？\n\n此操作将：\n1. 从本地数据库删除仓库\n2. 同步取消 GitHub 标星\n3. 同步删除关联的笔记\n\n此操作不可恢复！`
+					);
+					
 					if (!confirmed) return;
 					
 					try {
-						// 从数据库删除
-						await db.deleteNote(note.id);
-						// 从文件系统中删除（如果文件存在）
-						if (note.filePath) {
-							const file = this.plugin.app.vault.getAbstractFileByPath(note.filePath);
-							if (file instanceof TFile) {
-								await this.plugin.app.vault.delete(file);
-							}
+						if (this.plugin.octokit) {
+							await this.plugin.octokit.request(
+								'DELETE /user/starred/{owner}/{repo}',
+								{
+									owner: repo.owner,
+									repo: repo.name,
+									headers: {
+										'X-GitHub-Api-Version': '2026-03-10',
+									},
+								}
+							);
 						}
-						new Notice('笔记已删除');
-						// 重新加载笔记列表
-						this.currentNotes = await db.getNotesByRepoId(repo.id);
-						this.render();
+						
+						await db.hardDeleteRepo(repo.id);
+						new Notice(`已彻底删除: ${repo.owner}/${repo.name}`);
+						
+						const sidebarView = this.plugin.sidebarView;
+						if (!sidebarView) {
+							this.clearDetail();
+							return;
+						}
+
+						const currentIndex = sidebarView.filteredRepos.findIndex(r => r.id === currentRepoId);
+						await sidebarView.loadReposFromDB();
+						
+						const userCount = sidebarView.containerEl.querySelector('.user-count');
+						if (userCount) {
+							userCount.setText(`${sidebarView.repos.length} 个仓库`);
+						}
+						
+						const reposAfter = sidebarView.filteredRepos.length;
+						const nextRepo = reposAfter > 0
+							? sidebarView.filteredRepos[currentIndex < reposAfter ? currentIndex : currentIndex - 1]
+							: null;
+						
+						sidebarView.renderRepoList();
+						nextRepo ? sidebarView.selectRepo(nextRepo) : this.clearDetail();
 					} catch (error: any) {
-						new Notice('删除失败: ' + error.message);
+						new Notice('删除失败: ' + (error.message || '未知错误'));
 					}
 				});
 			}
-		} else {
-			// 如果没有笔记，显示空状态
-			notesCard.createDiv('info-empty-text').setText('暂无笔记，点击上方按钮创建');
+		});
+
+		// 笔记列表卡片
+		this.createCollapsePanel(sidebar, 'notes', '笔记', (content) => {
+			// 显示笔记列表
+			if (this.currentNotes.length > 0) {
+				const notesList = content.createDiv('notes-list');
+				for (const note of this.currentNotes) {
+					this.renderNoteItem(notesList, note, repo);
+				}
+			} else {
+				// 如果没有笔记，显示空状态
+				content.createDiv('info-empty-text').setText('暂无笔记，点击上方按钮创建');
+			}
+		}, {
+			actions: (actions: HTMLElement) => {
+				// 笔记数量显示（放在按钮左边）
+				const countEl = actions.createDiv('notes-count');
+				countEl.setText(`${this.currentNotes.length} 个`);
+
+				// 笔记操作按钮组
+				const notesActions = actions.createDiv('notes-actions');
+
+				// 新建笔记按钮
+				const createNoteBtn = notesActions.createEl('button', {
+					cls: 'info-edit-btn'
+				});
+				setIcon(createNoteBtn, 'plus');
+				createNoteBtn.setAttr('title', '新建笔记');
+				createNoteBtn.addEventListener('click', async () => {
+					await this.plugin.createRepoNoteWithTemplate(repo);
+					new Notice(`已为 ${repo.name} 创建笔记`);
+					this.currentNotes = await db.getNotesByRepoId(repo.id);
+					this.render();
+				});
+
+				// 关联已有笔记按钮
+				const linkNoteBtn = notesActions.createEl('button', {
+					cls: 'info-edit-btn'
+				});
+				setIcon(linkNoteBtn, 'link');
+				linkNoteBtn.setAttr('title', '关联已有笔记');
+				linkNoteBtn.addEventListener('click', async () => {
+					this.openNoteLinkModal(repo);
+				});
+			}
+		});
+	}
+
+	/**
+	 * 渲染笔记项
+	 */
+	private renderNoteItem(parent: HTMLElement, note: any, repo: any): void {
+		const noteItem = parent.createDiv('note-item');
+		// 悬浮显示完整路径
+		noteItem.setAttr('title', note.filePath || note.title);
+		
+		// 左侧：笔记信息
+		const noteInfo = noteItem.createDiv('note-info');
+		noteInfo.createEl('span', {
+			text: note.title,
+			cls: 'note-title'
+		});
+		noteInfo.createEl('span', {
+			text: new Date(note.createdAt).toLocaleDateString(),
+			cls: 'note-date'
+		});
+		
+		// 右侧：操作按钮
+		const noteActions = noteItem.createDiv('note-actions');
+		
+		// 打开笔记按钮
+		const openBtn = noteActions.createEl('button', {
+			cls: 'note-action-btn note-open-btn'
+		});
+		setIcon(openBtn, 'external-link');
+		openBtn.setAttr('title', '打开笔记');
+		openBtn.addEventListener('click', async () => {
+			if (note.filePath) {
+				let file = this.plugin.app.vault.getAbstractFileByPath(note.filePath);
+				
+				if (!(file instanceof TFile)) {
+					file = await this.findNoteByTitle(note.title);
+					if (file) {
+						await db.updateNote(note.id, { filePath: file.path });
+						note.filePath = file.path;
+					}
+				}
+				
+				if (file instanceof TFile) {
+					await this.plugin.app.workspace.getLeaf().openFile(file);
+				} else {
+					new Notice('笔记文件不存在');
+				}
+			}
+		});
+
+		// 删除笔记按钮
+		const deleteBtn = noteActions.createEl('button', {
+			cls: 'note-action-btn note-delete-btn'
+		});
+		setIcon(deleteBtn, 'trash-2');
+		deleteBtn.setAttr('title', '删除笔记');
+		deleteBtn.addEventListener('click', async () => {
+			const confirmed = window.confirm(`确定要删除笔记 "${note.title}" 吗？`);
+			if (!confirmed) return;
+			
+			try {
+				await db.deleteNote(note.id);
+				if (note.filePath) {
+					const file = this.plugin.app.vault.getAbstractFileByPath(note.filePath);
+					if (file instanceof TFile) {
+						await this.plugin.app.vault.delete(file);
+					}
+				}
+				new Notice('笔记已删除');
+				this.currentNotes = await db.getNotesByRepoId(repo.id);
+				this.render();
+			} catch (error: any) {
+				new Notice('删除失败: ' + error.message);
+			}
+		});
+	}
+
+	/**
+	 * 打开笔记关联弹窗
+	 */
+	private async openNoteLinkModal(repo: any): Promise<void> {
+		const linkedPaths = new Set(this.currentNotes.map(note => note.filePath).filter(Boolean));
+		
+		const allFiles = this.plugin.app.vault.getFiles();
+		const mdFiles = allFiles.filter(
+			file => file instanceof TFile && 
+			        file.extension === 'md' && 
+			        !linkedPaths.has(file.path)
+		);
+		
+		if (mdFiles.length === 0) {
+			new Notice('没有可关联的笔记（已全部关联或没有其他笔记）');
+			return;
 		}
+		
+		const modal = new Modal(this.plugin.app);
+		modal.titleEl.setText('选择要关联的笔记');
+		
+		const container = modal.contentEl.createDiv('note-select-container');
+		container.addClass('starvault-note-select');
+		
+		const searchWrapper = container.createDiv('note-search-wrapper');
+		const searchInput = searchWrapper.createEl('input', {
+			type: 'text',
+			placeholder: '输入关键字搜索笔记...',
+			cls: 'note-search-input'
+		});
+		
+		const selectedCountEl = container.createDiv('note-selected-count');
+		selectedCountEl.setText('已选择 0 个');
+		
+		const list = container.createEl('div', 'note-select-list');
+		const selectedPaths = new Set<string>();
+		
+		const renderFiles = (files: TFile[]) => {
+			list.empty();
+			selectedPaths.clear();
+			updateSelectedCount();
+			
+			if (files.length === 0) {
+				list.createDiv('note-select-empty').setText('没有找到匹配的笔记');
+				return;
+			}
+			
+			for (const file of files) {
+				const item = list.createEl('div', 'note-select-item');
+				
+				const checkbox = item.createEl('input', {
+					type: 'checkbox',
+					cls: 'note-item-checkbox'
+				});
+				checkbox.setAttribute('data-path', file.path);
+				
+				item.createEl('span', {
+					text: file.path,
+					cls: 'note-item-text'
+				});
+				
+				const toggleSelection = (e: Event) => {
+					const target = e.target as HTMLElement;
+					if (target === checkbox) {
+						checkbox.checked = !checkbox.checked;
+					}
+					
+					if (checkbox.checked) {
+						selectedPaths.add(file.path);
+					} else {
+						selectedPaths.delete(file.path);
+					}
+					updateSelectedCount();
+				};
+				
+				item.addEventListener('click', toggleSelection);
+				checkbox.addEventListener('click', toggleSelection);
+			}
+		};
+		
+		const updateSelectedCount = () => {
+			const count = selectedPaths.size;
+			selectedCountEl.setText(`已选择 ${count} 个`);
+			confirmBtn.disabled = count === 0;
+		};
+		
+		const buttonArea = container.createDiv('note-button-area');
+		
+		const selectAllBtn = buttonArea.createEl('button', {
+			text: '全选',
+			cls: 'note-btn note-btn-secondary'
+		});
+		selectAllBtn.addEventListener('click', () => {
+			list.querySelectorAll('.note-item-checkbox').forEach((cb) => {
+				const checkbox = cb as HTMLInputElement;
+				checkbox.checked = true;
+				const path = checkbox.getAttribute('data-path');
+				if (path) selectedPaths.add(path);
+			});
+			updateSelectedCount();
+		});
+		
+		const deselectAllBtn = buttonArea.createEl('button', {
+			text: '取消全选',
+			cls: 'note-btn note-btn-secondary'
+		});
+		deselectAllBtn.addEventListener('click', () => {
+			list.querySelectorAll('.note-item-checkbox').forEach((cb) => {
+				const checkbox = cb as HTMLInputElement;
+				checkbox.checked = false;
+			});
+			selectedPaths.clear();
+			updateSelectedCount();
+		});
+		
+		const confirmBtn = buttonArea.createEl('button', {
+			text: '确认关联',
+			cls: 'note-btn note-btn-primary'
+		});
+		confirmBtn.disabled = true;
+		confirmBtn.addEventListener('click', async () => {
+			if (selectedPaths.size === 0) return;
+			
+			modal.close();
+			
+			const repoName = `${repo.owner}/${repo.name}`;
+			let successCount = 0;
+			
+			for (const filePath of selectedPaths) {
+				const note = await db.linkNote(repo.id, repoName, filePath);
+				if (note) successCount++;
+			}
+			
+			new Notice(`已关联 ${successCount} 个笔记`);
+			this.currentNotes = await db.getNotesByRepoId(repo.id);
+			this.render();
+		});
+		
+		searchInput.addEventListener('input', () => {
+			const keyword = searchInput.value.toLowerCase().trim();
+			if (keyword) {
+				const filtered = mdFiles.filter(file => 
+					file.path.toLowerCase().includes(keyword)
+				);
+				renderFiles(filtered);
+			} else {
+				renderFiles(mdFiles);
+			}
+		});
+		
+		renderFiles(mdFiles);
+		
+		modal.open();
+		setTimeout(() => searchInput.focus(), 100);
 	}
 
 	/**

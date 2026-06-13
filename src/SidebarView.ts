@@ -65,7 +65,6 @@ export class StarVaultSidebarView extends ItemView {
   private searchQuery: string = '';
   public selectedRepoId: number | null = null;
   private selectedRepo: StarredRepo | null = null;
-  private createNoteBtn: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: StarVaultPlugin) {
     super(leaf);
@@ -239,15 +238,6 @@ export class StarVaultSidebarView extends ItemView {
       'arrow-up-down',
       '排序',
       (evt) => this.showSortMenu(evt)
-    );
-
-    // 新建笔记按钮（初始禁用，需选择仓库后启用）
-    this.createNoteBtn = this.createHeaderButton(
-      buttonContainer,
-      'plus',
-      '请先选择仓库',
-      () => this.createNewNote(),
-      true // 初始禁用
     );
 
     // 更多选项按钮
@@ -578,12 +568,6 @@ export class StarVaultSidebarView extends ItemView {
     const activeEl = this.repoListContainer.querySelector(`[data-repo-id="${repo.id}"]`);
     if (activeEl) activeEl.addClass('active');
 
-    // 启用新建笔记按钮
-    if (this.createNoteBtn) {
-      this.createNoteBtn.removeClass('is-disabled');
-      this.createNoteBtn.setAttribute('aria-label', `为 ${repo.owner}/${repo.name} 新建笔记`);
-    }
-
     // 触发主视图更新（通过插件事件）
     this.plugin.emitRepoSelected(repo);
 
@@ -873,6 +857,11 @@ export class StarVaultSidebarView extends ItemView {
     const saveTags = async () => {
       await db.updateRepoTags(repo.id, currentTags);
       await this.refreshRepoList();
+      // 更新右侧详情视图
+      const updatedRepo = this.repos.find(r => r.id === repo.id);
+      if (updatedRepo) {
+        this.plugin.emitRepoSelected(updatedRepo);
+      }
       new Notice('标签已保存');
       closeModal();
     };
