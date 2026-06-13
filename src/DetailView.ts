@@ -4,7 +4,7 @@
  * 按照 preview.html 的样式重新设计
  */
 
-import { ItemView, WorkspaceLeaf, setIcon, Notice, TFile } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon, Notice, TFile, Modal } from 'obsidian';
 import StarVaultPlugin from './main';
 import { StarredRepo } from './SidebarView';
 import { db } from './db';
@@ -201,20 +201,6 @@ export class StarVaultDetailView extends ItemView {
 			new Notice('已复制到剪贴板');
 		});
 
-		linkCard.createEl('a', {
-			text: '创建笔记',
-			cls: 'info-link',
-			href: '#'
-		}).addEventListener('click', async (e) => {
-			e.preventDefault();
-			try {
-				await this.plugin.createRepoNoteWithTemplate(repo);
-				new Notice(`已为 ${repo.name} 创建笔记`);
-			} catch (error: any) {
-				new Notice('创建笔记失败: ' + error.message);
-			}
-		});
-
 		// 取消标星/恢复/删除按钮
 		const isSoftDeleted = repo.deletedAt !== null && repo.deletedAt > 0;
 		const currentRepoId = repo.id;
@@ -340,7 +326,12 @@ export class StarVaultDetailView extends ItemView {
 		const notesCard = sidebar.createDiv('info-card');
 		const notesHeader = notesCard.createDiv('info-card-header');
 		notesHeader.createEl('h3', { text: '笔记' });
-		const createNoteBtn = notesHeader.createEl('button', {
+		
+		// 笔记操作按钮组
+		const notesActions = notesHeader.createDiv('notes-actions');
+		
+		// 新建笔记按钮
+		const createNoteBtn = notesActions.createEl('button', {
 			text: '+ 新建',
 			cls: 'info-edit-btn'
 		});
@@ -350,6 +341,188 @@ export class StarVaultDetailView extends ItemView {
 			// 重新加载笔记列表
 			this.currentNotes = await db.getNotesByRepoId(repo.id);
 			this.render();
+		});
+
+		// 关联已有笔记按钮
+		const linkNoteBtn = notesActions.createEl('button', {
+			text: '关联',
+			cls: 'info-edit-btn'
+		});
+		linkNoteBtn.setAttr('title', '关联已有笔记');
+		linkNoteBtn.addEventListener('click', async () => {
+			// 获取当前仓库已关联的笔记文件路径
+			const linkedPaths = new Set(this.currentNotes.map(note => note.filePath).filter(Boolean));
+			
+			// 获取所有 Markdown 文件，排除已关联的
+			const allFiles = this.plugin.app.vault.getFiles();
+			const mdFiles = allFiles.filter(
+				file => file instanceof TFile && 
+				        file.extension === 'md' && 
+				        !linkedPaths.has(file.path)
+			);
+			
+			if (mdFiles.length === 0) {
+				new Notice('没有可关联的笔记（已全部关联或没有其他笔记）');
+				return;
+			}
+			
+			// 创建自定义文件选择弹窗
+			const modal = new Modal(this.plugin.app);
+			modal.titleEl.setText('选择要关联的笔记');
+			
+			// 创建文件列表容器
+			const container = modal.contentEl.createDiv('note-select-container');
+			container.addClass('starvault-note-select');
+			
+			// 创建搜索框
+			const searchWrapper = container.createDiv('note-search-wrapper');
+			const searchInput = searchWrapper.createEl('input', {
+				type: 'text',
+				placeholder: '输入关键字搜索笔记...',
+				cls: 'note-search-input'
+			});
+			
+			// 创建已选计数显示
+			const selectedCountEl = container.createDiv('note-selected-count');
+			selectedCountEl.setText('已选择 0 个');
+			
+			// 创建文件列表
+			const list = container.createEl('div', 'note-select-list');
+			
+			// 选中的文件路径集合
+			const selectedPaths = new Set<string>();
+			
+			// 渲染文件列表的函数
+			const renderFiles = (files: TFile[]) => {
+				list.empty();  // 清空列表
+				selectedPaths.clear();  // 清空选择
+				updateSelectedCount();
+				
+				if (files.length === 0) {
+					list.createDiv('note-select-empty').setText('没有找到匹配的笔记');
+					return;
+				}
+				
+				for (const file of files) {
+					const item = list.createEl('div', 'note-select-item');
+					
+					// 创建复选框
+					const checkbox = item.createEl('input', {
+						type: 'checkbox',
+						cls: 'note-item-checkbox'
+					});
+					checkbox.setAttribute('data-path', file.path);
+					
+					// 文件路径文本
+					item.createEl('span', {
+						text: file.path,
+						cls: 'note-item-text'
+					});
+					
+					// 点击整行或复选框都能选中
+					const toggleSelection = (e: Event) => {
+						const target = e.target as HTMLElement;
+						if (target === checkbox) {
+							checkbox.checked = !checkbox.checked;
+						}
+						
+						if (checkbox.checked) {
+							selectedPaths.add(file.path);
+						} else {
+							selectedPaths.delete(file.path);
+						}
+						updateSelectedCount();
+					};
+					
+					item.addEventListener('click', toggleSelection);
+					checkbox.addEventListener('click', toggleSelection);
+				}
+			};
+			
+			// 更新已选计数
+			const updateSelectedCount = () => {
+				const count = selectedPaths.size;
+				selectedCountEl.setText(`已选择 ${count} 个`);
+				confirmBtn.disabled = count === 0;
+			};
+			
+			// 创建底部按钮区域
+			const buttonArea = container.createDiv('note-button-area');
+			
+			// 全选按钮
+			const selectAllBtn = buttonArea.createEl('button', {
+				text: '全选',
+				cls: 'note-btn note-btn-secondary'
+			});
+			selectAllBtn.addEventListener('click', () => {
+				list.querySelectorAll('.note-item-checkbox').forEach((cb) => {
+					const checkbox = cb as HTMLInputElement;
+					checkbox.checked = true;
+					const path = checkbox.getAttribute('data-path');
+					if (path) selectedPaths.add(path);
+				});
+				updateSelectedCount();
+			});
+			
+			// 取消全选按钮
+			const deselectAllBtn = buttonArea.createEl('button', {
+				text: '取消全选',
+				cls: 'note-btn note-btn-secondary'
+			});
+			deselectAllBtn.addEventListener('click', () => {
+				list.querySelectorAll('.note-item-checkbox').forEach((cb) => {
+					const checkbox = cb as HTMLInputElement;
+					checkbox.checked = false;
+				});
+				selectedPaths.clear();
+				updateSelectedCount();
+			});
+			
+			// 确认关联按钮
+			const confirmBtn = buttonArea.createEl('button', {
+				text: '确认关联',
+				cls: 'note-btn note-btn-primary'
+			});
+			confirmBtn.disabled = true;
+			confirmBtn.addEventListener('click', async () => {
+				if (selectedPaths.size === 0) return;
+				
+				modal.close();
+				
+				// 批量关联笔记
+				const repoName = `${repo.owner}/${repo.name}`;
+				let successCount = 0;
+				
+				for (const filePath of selectedPaths) {
+					const note = await db.linkNote(repo.id, repoName, filePath);
+					if (note) successCount++;
+				}
+				
+				new Notice(`已关联 ${successCount} 个笔记`);
+				// 重新加载笔记列表
+				this.currentNotes = await db.getNotesByRepoId(repo.id);
+				this.render();
+			});
+			
+			// 监听搜索输入，实时过滤
+			searchInput.addEventListener('input', () => {
+				const keyword = searchInput.value.toLowerCase().trim();
+				if (keyword) {
+					const filtered = mdFiles.filter(file => 
+						file.path.toLowerCase().includes(keyword)
+					);
+					renderFiles(filtered);
+				} else {
+					renderFiles(mdFiles);
+				}
+			});
+			
+			// 初始渲染所有文件
+			renderFiles(mdFiles);
+			
+			modal.open();
+			// 自动聚焦到搜索框
+			setTimeout(() => searchInput.focus(), 100);
 		});
 
 		// 显示笔记列表

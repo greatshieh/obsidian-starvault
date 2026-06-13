@@ -109,6 +109,7 @@
   flex-direction: column;
   min-width: 0;
   flex: 1;
+  gap: 4px;
 }
 
 .user-name {
@@ -642,6 +643,12 @@
   margin-bottom: 0;
 }
 
+/* 笔记操作按钮组 */
+.starvault-detail-view .notes-actions {
+  display: flex;
+  gap: 4px;
+}
+
 .starvault-detail-view .info-card h3 {
   font-size: 12px;
   font-weight: 600;
@@ -922,6 +929,135 @@
   font-size: 13px;
   color: var(--text-faint);
   margin: 0;
+}
+
+/* 笔记选择弹窗样式 */
+.starvault-note-select {
+  width: 500px;
+  max-width: 90vw;
+}
+
+.starvault-note-select .note-search-wrapper {
+  margin-bottom: 10px;
+}
+
+.starvault-note-select .note-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.starvault-note-select .note-search-input:focus {
+  border-color: var(--interactive-accent);
+}
+
+.starvault-note-select .note-search-input::placeholder {
+  color: var(--text-faint);
+}
+
+.starvault-note-select .note-selected-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding: 4px 0;
+}
+
+.starvault-note-select .note-select-list {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+}
+
+.starvault-note-select .note-select-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-normal);
+  border-bottom: 1px solid var(--background-modifier-border);
+  transition: background 0.1s;
+}
+
+.starvault-note-select .note-select-item:last-child {
+  border-bottom: none;
+}
+
+.starvault-note-select .note-select-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.starvault-note-select .note-item-checkbox {
+  flex-shrink: 0;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.starvault-note-select .note-item-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.starvault-note-select .note-select-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+/* 底部按钮区域 */
+.starvault-note-select .note-button-area {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.starvault-note-select .note-btn {
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.starvault-note-select .note-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.starvault-note-select .note-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.starvault-note-select .note-btn-primary {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: white;
+}
+
+.starvault-note-select .note-btn-primary:hover:not(:disabled) {
+  background: var(--interactive-accent-hover);
+}
+
+.starvault-note-select .note-btn-secondary {
+  background: transparent;
 }
 
 

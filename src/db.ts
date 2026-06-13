@@ -110,6 +110,7 @@ class StarVaultDB extends Dexie {
         'id',                          // 主键
         'repoId',                      // 按仓库 ID 查询
         'title',                       // 按标题查询
+        'filePath',                    // 按文件路径查询（检查重复关联）
         'createdAt',                   // 按创建时间排序
         'updatedAt',                   // 按更新时间排序
         '*tags',                       // 多值索引：按标签查询
@@ -329,6 +330,56 @@ class StarVaultDB extends Dexie {
    */
   async deleteNote(noteId: string): Promise<void> {
     await this.notes.delete(noteId);
+  }
+
+  /**
+   * 手动关联已有笔记到仓库
+   * @param repoId 仓库 ID
+   * @param repoName 仓库全名
+   * @param filePath 文件路径
+   * @returns 关联后的笔记对象，如果文件不存在或已关联返回 null
+   */
+  async linkNote(repoId: number, repoName: string, filePath: string): Promise<DBNote | null> {
+    // 检查笔记是否已存在（通过文件路径）- 使用 filter 以防 filePath 索引不存在
+    let existingNote: DBNote | undefined;
+    try {
+      existingNote = await this.notes.where('filePath').equals(filePath).first();
+    } catch {
+      // 如果索引不存在，使用 filter
+      const allNotes = await this.notes.toArray();
+      existingNote = allNotes.find(n => n.filePath === filePath);
+    }
+    
+    if (existingNote) {
+      return existingNote;  // 已关联，返回现有记录
+    }
+
+    // 从文件路径提取文件名作为标题
+    const fileName = filePath.split('/').pop()?.replace('.md', '') || '';
+
+    // 创建关联记录
+    const now = Date.now();
+    const note: DBNote = {
+      id: crypto.randomUUID(),
+      repoId,
+      repoName,
+      title: fileName,
+      content: '',
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+      filePath,
+      isOrphaned: false,
+    };
+    await this.notes.put(note);
+    return note;
+  }
+
+  /**
+   * 获取孤立笔记（仓库已删除但笔记保留）
+   */
+  async getOrphanedNotes(): Promise<DBNote[]> {
+    return this.notes.filter(note => note.isOrphaned).toArray();
   }
 
   /**
