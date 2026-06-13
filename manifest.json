@@ -1,7 +1,7 @@
 {
 	"id": "starvault",
 	"name": "StarVault",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"minAppVersion": "1.4.5",
 	"description": "GitHub starred repositories sync and management tool.",
 	"author": "greatshieh",
