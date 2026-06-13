@@ -8,6 +8,7 @@ import { ItemView, WorkspaceLeaf, setIcon, Notice, TFile, Modal } from 'obsidian
 import StarVaultPlugin from './main';
 import { StarredRepo } from './SidebarView';
 import { db } from './db';
+import { t } from './lang';
 
 export const VIEW_TYPE_STARNEST_DETAIL = 'starvault-detail';
 
@@ -29,7 +30,7 @@ export class StarVaultDetailView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return '仓库详情';
+		return t('detailView.title', this.plugin.settings.language);
 	}
 
 	getIcon(): string {
@@ -114,10 +115,13 @@ export class StarVaultDetailView extends ItemView {
 	 * 显示仓库详情
 	 */
 	async showRepoDetail(repo: StarredRepo): Promise<void> {
+		console.log('showRepoDetail called for repo:', repo.owner, repo.name);
 		this.currentRepo = repo;
 		// 加载该仓库的笔记
-		this.currentNotes = await db.getNotesByRepoId(repo.id);
+		this.currentNotes = await db.getNotesByRepoId(repo.id, this.plugin.currentUserId);
+		console.log('Current notes loaded:', this.currentNotes.length);
 		this.render();
+		console.log('render() called');
 	}
 
 	/**
@@ -134,14 +138,17 @@ export class StarVaultDetailView extends ItemView {
 	 * 渲染视图内容
 	 */
 	public render(): void {
+		console.log('render() called, currentRepo:', this.currentRepo);
 		const container = this.containerEl;
 		container.empty();
 
 		if (!this.currentRepo) {
+			console.log('No currentRepo, rendering empty state');
 			this.renderEmptyState(container);
 			return;
 		}
 
+		console.log('Rendering repo detail for:', this.currentRepo.owner, this.currentRepo.name);
 		const repo = this.currentRepo;
 
 		// 创建详情侧边栏容器
@@ -149,14 +156,14 @@ export class StarVaultDetailView extends ItemView {
 
 		// Description 卡片
 		if (repo.description) {
-			this.createCollapsePanel(sidebar, 'description', '描述', (content) => {
+			this.createCollapsePanel(sidebar, 'description', t('detailView.description', this.plugin.settings.language), (content) => {
 				content.createDiv('info-description').setText(repo.description);
 			});
 		}
 
 		// Topics 卡片
 		if (repo.topics && repo.topics.length > 0) {
-			this.createCollapsePanel(sidebar, 'topics', 'Topics', (content) => {
+			this.createCollapsePanel(sidebar, 'topics', t('detailView.topics', this.plugin.settings.language), (content) => {
 				const topicsContainer = content.createDiv('info-tags');
 				repo.topics.forEach((topic: string) => {
 					topicsContainer.createEl('span', {
@@ -168,24 +175,24 @@ export class StarVaultDetailView extends ItemView {
 		}
 
 		// 仓库信息卡片
-		this.createCollapsePanel(sidebar, 'info', '仓库信息', (content) => {
-			content.createDiv('info-row').innerHTML = `<span class="label">创建时间</span><span class="value">${repo.createdAt || '-'}</span>`;
-			content.createDiv('info-row').innerHTML = `<span class="label">最后推送</span><span class="value">${repo.updatedAt || '-'}</span>`;
-			content.createDiv('info-row').innerHTML = `<span class="label">Star 数量</span><span class="value accent">${this.formatNumber(repo.stars)}</span>`;
-			content.createDiv('info-row').innerHTML = `<span class="label">Fork 数量</span><span class="value">${this.formatNumber(repo.forks)}</span>`;
+		this.createCollapsePanel(sidebar, 'info', t('detailView.repoInfo', this.plugin.settings.language), (content) => {
+			content.createDiv('info-row').innerHTML = `<span class="label">${t('detailView.createdAt', this.plugin.settings.language)}</span><span class="value">${repo.createdAt || '-'}</span>`;
+			content.createDiv('info-row').innerHTML = `<span class="label">${t('detailView.lastPush', this.plugin.settings.language)}</span><span class="value">${repo.updatedAt || '-'}</span>`;
+			content.createDiv('info-row').innerHTML = `<span class="label">${t('detailView.stars', this.plugin.settings.language)}</span><span class="value accent">${this.formatNumber(repo.stars)}</span>`;
+			content.createDiv('info-row').innerHTML = `<span class="label">${t('detailView.forks', this.plugin.settings.language)}</span><span class="value">${this.formatNumber(repo.forks)}</span>`;
 			
 			if (repo.language) {
-				content.createDiv('info-row').innerHTML = `<span class="label">语言</span><span class="value"><span class="lang-dot" style="background: ${repo.languageColor}"></span>${repo.language}</span>`;
+				content.createDiv('info-row').innerHTML = `<span class="label">${t('detailView.language', this.plugin.settings.language)}</span><span class="value"><span class="lang-dot" style="background: ${repo.languageColor}"></span>${repo.language}</span>`;
 			}
 			
 			if (repo.isArchived) {
-				content.createDiv('info-row').innerHTML = `<span class="label">状态</span><span class="value warning">⚠️ 已归档</span>`;
+				content.createDiv('info-row').innerHTML = `<span class="label">${t('detailView.status', this.plugin.settings.language)}</span><span class="value warning">⚠️ ${t('detailView.archived', this.plugin.settings.language)}</span>`;
 			}
 		});
 
 		// 自定义标签卡片
 		if (repo.tags && repo.tags.length > 0) {
-			this.createCollapsePanel(sidebar, 'tags', '自定义标签', (content) => {
+			this.createCollapsePanel(sidebar, 'tags', t('detailView.customTags', this.plugin.settings.language), (content) => {
 				const tagsContainer = content.createDiv('info-tags');
 				repo.tags.forEach((tag: string) => {
 					const tagEl = tagsContainer.createEl('span', {
@@ -202,7 +209,7 @@ export class StarVaultDetailView extends ItemView {
 						cls: 'info-edit-btn'
 					});
 					setIcon(editBtn, 'pencil');
-					editBtn.setAttr('title', '编辑标签');
+					editBtn.setAttr('title', t('detailView.editTag', this.plugin.settings.language));
 					editBtn.addEventListener('click', () => {
 						const sidebarView = this.app.workspace.getLeavesOfType('starvault-sidebar')[0];
 						if (sidebarView) {
@@ -215,15 +222,15 @@ export class StarVaultDetailView extends ItemView {
 				}
 			});
 		} else {
-			this.createCollapsePanel(sidebar, 'tags', '自定义标签', (content) => {
-				content.createDiv('info-empty-text').setText('暂无标签');
+			this.createCollapsePanel(sidebar, 'tags', t('detailView.customTags', this.plugin.settings.language), (content) => {
+				content.createDiv('info-empty-text').setText(t('detailView.noTags', this.plugin.settings.language));
 			}, {
 				actions: (actions) => {
 					const addBtn = actions.createEl('button', {
 						cls: 'info-edit-btn'
 					});
 					setIcon(addBtn, 'plus');
-					addBtn.setAttr('title', '添加标签');
+					addBtn.setAttr('title', t('detailView.addTag', this.plugin.settings.language));
 					addBtn.addEventListener('click', () => {
 						const sidebarView = this.app.workspace.getLeavesOfType('starvault-sidebar')[0];
 						if (sidebarView) {
@@ -238,9 +245,9 @@ export class StarVaultDetailView extends ItemView {
 		}
 
 		// 链接卡片
-		this.createCollapsePanel(sidebar, 'links', '链接', (content) => {
+		this.createCollapsePanel(sidebar, 'links', t('detailView.links', this.plugin.settings.language), (content) => {
 			content.createEl('a', {
-				text: '在 Github 查看',
+				text: t('detailView.viewOnGithub', this.plugin.settings.language),
 				cls: 'info-link',
 				href: '#'
 			}).addEventListener('click', async (e) => {
@@ -250,7 +257,7 @@ export class StarVaultDetailView extends ItemView {
 			});
 
 			content.createEl('a', {
-				text: '在 Zread 查看',
+				text: t('detailView.viewOnZread', this.plugin.settings.language),
 				cls: 'info-link',
 				href: '#'
 			}).addEventListener('click', async (e) => {
@@ -260,7 +267,7 @@ export class StarVaultDetailView extends ItemView {
 			});
 
 			content.createEl('a', {
-				text: '在 DeepWiKi 查看',
+				text: t('detailView.viewOnDeepwiki', this.plugin.settings.language),
 				cls: 'info-link',
 				href: '#'
 			}).addEventListener('click', async (e) => {
@@ -270,13 +277,13 @@ export class StarVaultDetailView extends ItemView {
 			});
 
 			content.createEl('a', {
-				text: '复制 Clone URL',
+				text: t('detailView.copyCloneUrl', this.plugin.settings.language),
 				cls: 'info-link',
 				href: '#'
 			}).addEventListener('click', (e) => {
 				e.preventDefault();
 				navigator.clipboard.writeText(`https://github.com/${repo.owner}/${repo.name}.git`);
-				new Notice('已复制到剪贴板');
+				new Notice(t('detailView.copiedToClipboard', this.plugin.settings.language));
 			});
 
 			// 取消标星/恢复/删除按钮
@@ -286,14 +293,14 @@ export class StarVaultDetailView extends ItemView {
 			if (!isSoftDeleted) {
 				// 未删除状态：显示取消标星按钮
 				const cancelStarBtn = content.createEl('button', {
-					text: '取消标星',
+					text: t('detailView.cancelStar', this.plugin.settings.language),
 					cls: 'info-link'
 				});
 				
 				cancelStarBtn.addEventListener('click', async () => {
 					try {
 						await db.softDeleteRepo(repo.id);
-						new Notice(`已取消标星: ${repo.owner}/${repo.name}`);
+						new Notice(t('notices.unstarSuccess', this.plugin.settings.language).replace('{name}', `${repo.owner}/${repo.name}`));
 						if (this.plugin.sidebarView) {
 							await this.plugin.sidebarView.loadReposFromDB();
 							this.plugin.sidebarView.selectedRepoId = currentRepoId;
@@ -304,20 +311,20 @@ export class StarVaultDetailView extends ItemView {
 							}
 						}
 					} catch (error: any) {
-						new Notice('操作失败: ' + error.message);
+						new Notice(t('detailView.operationFailed', this.plugin.settings.language) + error.message);
 					}
 				});
 			} else {
 				// 软删除状态：显示恢复和删除按钮
 				const restoreBtn = content.createEl('button', {
-					text: '恢复',
+					text: t('detailView.restore', this.plugin.settings.language),
 					cls: 'info-restore-btn'
 				});
 				
 				restoreBtn.addEventListener('click', async () => {
 					try {
 						await db.restoreRepo(repo.id);
-						new Notice(`已恢复标星: ${repo.owner}/${repo.name}`);
+						new Notice(t('notices.restoreSuccess', this.plugin.settings.language).replace('{name}', `${repo.owner}/${repo.name}`));
 						if (this.plugin.sidebarView) {
 							await this.plugin.sidebarView.loadReposFromDB();
 							this.plugin.sidebarView.selectedRepoId = currentRepoId;
@@ -328,18 +335,18 @@ export class StarVaultDetailView extends ItemView {
 							}
 						}
 					} catch (error: any) {
-						new Notice('恢复失败: ' + error.message);
+						new Notice(t('detailView.restoreFailed', this.plugin.settings.language) + error.message);
 					}
 				});
 				
 				const deleteBtn = content.createEl('button', {
-					text: '删除',
+					text: t('buttons.delete', this.plugin.settings.language),
 					cls: 'info-danger-btn'
 				});
 				
 				deleteBtn.addEventListener('click', async () => {
 					const confirmed = window.confirm(
-						`确定要彻底删除 "${repo.owner}/${repo.name}" 吗？\n\n此操作将：\n1. 从本地数据库删除仓库\n2. 同步取消 GitHub 标星\n3. 同步删除关联的笔记\n\n此操作不可恢复！`
+						t('detailView.confirmDelete', this.plugin.settings.language).replace('{name}', `${repo.owner}/${repo.name}`)
 					);
 					
 					if (!confirmed) return;
@@ -359,7 +366,7 @@ export class StarVaultDetailView extends ItemView {
 						}
 						
 						await db.hardDeleteRepo(repo.id);
-						new Notice(`已彻底删除: ${repo.owner}/${repo.name}`);
+						new Notice(t('detailView.deleted', this.plugin.settings.language) + `${repo.owner}/${repo.name}`);
 						
 						const sidebarView = this.plugin.sidebarView;
 						if (!sidebarView) {
@@ -372,7 +379,7 @@ export class StarVaultDetailView extends ItemView {
 						
 						const userCount = sidebarView.containerEl.querySelector('.user-count');
 						if (userCount) {
-							userCount.setText(`${sidebarView.repos.length} 个仓库`);
+							userCount.setText(`${sidebarView.repos.length} ${t('sidebar.repos', this.plugin.settings.language)}`);
 						}
 						
 						const reposAfter = sidebarView.filteredRepos.length;
@@ -383,14 +390,14 @@ export class StarVaultDetailView extends ItemView {
 						sidebarView.renderRepoList();
 						nextRepo ? sidebarView.selectRepo(nextRepo) : this.clearDetail();
 					} catch (error: any) {
-						new Notice('删除失败: ' + (error.message || '未知错误'));
+						new Notice(t('notices.deleteFailed', this.plugin.settings.language) + (error.message || t('errors.unknown', this.plugin.settings.language)));
 					}
 				});
 			}
 		});
 
 		// 笔记列表卡片
-		this.createCollapsePanel(sidebar, 'notes', '笔记', (content) => {
+		this.createCollapsePanel(sidebar, 'notes', t('detailView.notesTitle', this.plugin.settings.language), (content) => {
 			// 显示笔记列表
 			if (this.currentNotes.length > 0) {
 				const notesList = content.createDiv('notes-list');
@@ -399,13 +406,13 @@ export class StarVaultDetailView extends ItemView {
 				}
 			} else {
 				// 如果没有笔记，显示空状态
-				content.createDiv('info-empty-text').setText('暂无笔记，点击上方按钮创建');
+				content.createDiv('info-empty-text').setText(t('detailView.noNotes', this.plugin.settings.language));
 			}
 		}, {
 			actions: (actions: HTMLElement) => {
 				// 笔记数量显示（放在按钮左边）
 				const countEl = actions.createDiv('notes-count');
-				countEl.setText(`${this.currentNotes.length} 个`);
+				countEl.setText(`${this.currentNotes.length} ${t('detailView.notesCount', this.plugin.settings.language)}`);
 
 				// 笔记操作按钮组
 				const notesActions = actions.createDiv('notes-actions');
@@ -415,11 +422,11 @@ export class StarVaultDetailView extends ItemView {
 					cls: 'info-edit-btn'
 				});
 				setIcon(createNoteBtn, 'plus');
-				createNoteBtn.setAttr('title', '新建笔记');
+				createNoteBtn.setAttr('title', t('detailView.createNote', this.plugin.settings.language));
 				createNoteBtn.addEventListener('click', async () => {
 					await this.plugin.createRepoNoteWithTemplate(repo);
-					new Notice(`已为 ${repo.name} 创建笔记`);
-					this.currentNotes = await db.getNotesByRepoId(repo.id);
+					new Notice(t('notices.noteCreated', this.plugin.settings.language).replace('{name}', repo.name));
+					this.currentNotes = await db.getNotesByRepoId(repo.id, this.plugin.currentUserId);
 					this.render();
 				});
 
@@ -428,7 +435,7 @@ export class StarVaultDetailView extends ItemView {
 					cls: 'info-edit-btn'
 				});
 				setIcon(linkNoteBtn, 'link');
-				linkNoteBtn.setAttr('title', '关联已有笔记');
+				linkNoteBtn.setAttr('title', t('detailView.linkNote', this.plugin.settings.language));
 				linkNoteBtn.addEventListener('click', async () => {
 					this.openNoteLinkModal(repo);
 				});
@@ -503,7 +510,7 @@ export class StarVaultDetailView extends ItemView {
 					}
 				}
 				new Notice('笔记已删除');
-				this.currentNotes = await db.getNotesByRepoId(repo.id);
+				this.currentNotes = await db.getNotesByRepoId(repo.id, this.plugin.currentUserId);
 				this.render();
 			} catch (error: any) {
 				new Notice('删除失败: ' + error.message);
@@ -645,7 +652,7 @@ export class StarVaultDetailView extends ItemView {
 			}
 			
 			new Notice(`已关联 ${successCount} 个笔记`);
-			this.currentNotes = await db.getNotesByRepoId(repo.id);
+			this.currentNotes = await db.getNotesByRepoId(repo.id, this.plugin.currentUserId);
 			this.render();
 		});
 		
@@ -685,12 +692,12 @@ export class StarVaultDetailView extends ItemView {
 		setIcon(iconEl, 'file-search');
 
 		emptyState.createEl('p', {
-			text: '暂无仓库详情',
+			text: t('detailView.selectRepo', this.plugin.settings.language),
 			cls: 'empty-title'
 		});
 
 		emptyState.createEl('p', {
-			text: '从左侧列表选择一个仓库查看详情',
+			text: t('detailView.noRepoSelected', this.plugin.settings.language),
 			cls: 'empty-desc'
 		});
 	}

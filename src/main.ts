@@ -9,8 +9,9 @@ import { StarVaultDetailView, VIEW_TYPE_STARNEST_DETAIL } from './DetailView';
 import { StarVaultReadmeView, VIEW_TYPE_STARNEST_README } from './ReadmeView';
 import { StarVaultSettingTab } from './settings';
 import { Octokit } from 'octokit';
-import { db, githubRepoToDBRepo } from './db';
+import { db, githubRepoToDBRepo, DBUser } from './db';
 import { searchService } from './search';
+import { t } from './lang';
 import * as languageColorsRaw from './color.json';
 const languageColors = languageColorsRaw as Record<string, string>;
 
@@ -26,6 +27,7 @@ interface StarVaultSettings {
 	noteTemplate: string;
 	notePathTemplate: string;
 	noteNameTemplate: string;
+	language: 'en' | 'zh'; // 界面语言
 }
 
 // 默认设置
@@ -37,6 +39,7 @@ const DEFAULT_SETTINGS: StarVaultSettings = {
 	autoSyncInterval: 0,
 	defaultSort: 'stars-desc',
 	showArchived: false,
+	language: 'zh', // 默认中文
 	noteTemplate: `---
 repo: {{repo}}
 owner: {{owner}}
@@ -67,6 +70,7 @@ export default class StarVaultPlugin extends Plugin {
 	detailView: StarVaultDetailView | null = null;
 	readmeView: StarVaultReadmeView | null = null;
 	octokit: Octokit | null = null;
+	currentUserId: string = 'default';  // 当前活跃用户 ID
 
 	async onload() {
 		// 加载设置
@@ -74,6 +78,9 @@ export default class StarVaultPlugin extends Plugin {
 
 		// 初始化 Octokit
 		this.initOctokit();
+
+		// 初始化当前用户（多用户支持）
+		await this.initCurrentUser();
 
 		// 注册左侧边栏视图
 		this.registerView(
@@ -105,31 +112,31 @@ export default class StarVaultPlugin extends Plugin {
 		// 添加命令
 		this.addCommand({
 			id: 'open-starvault-sidebar',
-			name: '打开 StarVault 侧边栏',
+			name: t('commands.openSidebar', this.settings.language),
 			callback: () => this.activateSidebarView(),
 		});
 
 		this.addCommand({
 			id: 'open-starvault-detail',
-			name: '打开 StarVault 详情',
+			name: 'Open StarVault Detail',
 			callback: () => this.activateDetailView(),
 		});
 
 		this.addCommand({
 			id: 'open-starvault-readme',
-			name: '打开 StarVault README',
+			name: 'Open StarVault README',
 			callback: () => this.activateReadmeView(),
 		});
 
 		this.addCommand({
 			id: 'sync-github-stars',
-			name: '同步 GitHub Stars',
+			name: t('commands.syncStars', this.settings.language),
 			callback: () => this.syncGitHubStars(),
 		});
 
 		this.addCommand({
 			id: 'create-repo-note',
-			name: '为当前仓库创建笔记',
+			name: 'Create Note for Current Repo',
 			callback: () => this.createNoteForCurrentRepo(),
 		});
 
@@ -200,6 +207,92 @@ export default class StarVaultPlugin extends Plugin {
 		} else {
 			this.octokit = null;
 		}
+	}
+
+	/**
+	 * 初始化当前用户（多用户支持）
+	 * 尝试从数据库获取活跃用户，如果没有则使用默认用户
+	 * 同时处理老用户升级，自动获取 GitHub 用户信息
+	 */
+	async initCurrentUser(): Promise<void> {
+		// 如果 Token 已配置但用户表中没有 Token，先迁移 Token 到默认用户
+		if (this.settings.githubToken) {
+			const users = await db.getAllUsers();
+			const activeUser = users.find(u => u.isActive);
+			
+			if (activeUser && !activeUser.token && activeUser.id === 'default') {
+				// 首次升级：将现有 Token 迁移到默认用户
+				await db.updateUser('default', { 
+					token: this.settings.githubToken,
+					name: '默认账号'
+				});
+			}
+		}
+		
+		// 获取活跃用户
+		let activeUser = await db.getActiveUser();
+		if (activeUser) {
+			this.currentUserId = activeUser.id;
+			// 如果活跃用户有 Token，同步到设置
+			if (activeUser.token && !this.settings.githubToken) {
+				this.settings.githubToken = activeUser.token;
+				await this.saveSettings();
+			}
+			
+			// 老用户升级：如果有 Token 但没有 GitHub 用户信息，自动获取
+			if (activeUser.token && !activeUser.login) {
+				try {
+					await this.fetchAndUpdateUserInfo();
+					// 重新获取更新后的用户信息
+					activeUser = await db.getActiveUser();
+				} catch (error) {
+					console.warn('Failed to fetch user info during upgrade:', error);
+				}
+			}
+		} else {
+			this.currentUserId = 'default';
+		}
+	}
+
+	/**
+	 * 获取并更新当前用户的 GitHub 信息
+	 */
+	private async fetchAndUpdateUserInfo(): Promise<void> {
+		if (!this.settings.githubToken) return;
+		
+		this.initOctokit();
+		if (!this.octokit) return;
+		
+		try {
+			const userResponse = await this.octokit.request('GET /user', {
+				headers: {
+					'X-GitHub-Api-Version': '2026-03-10',
+				},
+			});
+			const githubUser = userResponse.data as any;
+			
+			// 更新当前用户的 GitHub 信息
+			await db.updateUser(this.currentUserId, {
+				login: githubUser.login || '',
+				avatarUrl: githubUser.avatar_url || '',
+			});
+			
+			// 同步到设置
+			this.settings.username = githubUser.login || '';
+			this.settings.userAvatar = githubUser.avatar_url || '';
+			await this.saveSettings();
+			
+			new Notice(t('notices.userUpdated', this.settings.language));
+		} catch (error) {
+			console.error('Failed to fetch user info:', error);
+		}
+	}
+
+	/**
+	 * 获取当前活跃用户
+	 */
+	async getCurrentUser(): Promise<DBUser | undefined> {
+		return db.getUser(this.currentUserId);
 	}
 
 	/**
@@ -281,7 +374,27 @@ export default class StarVaultPlugin extends Plugin {
 		let totalFetched = 0;
 
 		try {
-			// 第一步：保存现有仓库的自定义数据（标签和删除状态）
+			// 第一步：获取当前用户信息
+			new Notice('Fetching user info...');
+			const userResponse = await this.octokit.request('GET /user', {
+				headers: {
+					'X-GitHub-Api-Version': '2026-03-10',
+				},
+			});
+			const githubUser = userResponse.data as any;
+			
+			// 更新当前用户的 GitHub 信息
+			await db.updateUser(this.currentUserId, {
+				login: githubUser.login || '',
+				avatarUrl: githubUser.avatar_url || '',
+			});
+			
+			// 同步到设置
+			this.settings.username = githubUser.login || '';
+			this.settings.userAvatar = githubUser.avatar_url || '';
+			await this.saveSettings();
+
+			// 第二步：保存现有仓库的自定义数据（标签和删除状态）
 			const existingRepos = await db.repos.toArray();
 			const existingDataMap = new Map<number, {
 				tags: string[];
@@ -296,7 +409,7 @@ export default class StarVaultPlugin extends Plugin {
 			});
 
 			// 第二步：从 GitHub 获取所有 starred 仓库（原始 API 数据）
-			new Notice('正在获取 GitHub Stars...');
+			new Notice('Fetching GitHub Stars...');
 			const rawRepos: any[] = [];
 			page = 1;
 			const perPage = 100;
@@ -319,16 +432,16 @@ export default class StarVaultPlugin extends Plugin {
 
 				rawRepos.push(...data);
 				totalFetched += data.length;
-				new Notice(`正在获取第 ${page} 页... (已获取 ${totalFetched} 个仓库)`);
+				new Notice(`Fetching page ${page}... (${totalFetched} repos fetched)`);
 
 				if (data.length < perPage) break;
 				page++;
 			}
 
 			// 第三步：转换并合并自定义数据
-			new Notice(`正在保存 ${rawRepos.length} 个仓库到本地数据库...`);
+			new Notice(`Saving ${rawRepos.length} repos to local database...`);
 			const dbRepos = rawRepos.map(repo => {
-				const dbRepo = githubRepoToDBRepo(repo, this.getLanguageColor(repo.language));
+				const dbRepo = githubRepoToDBRepo(repo, this.getLanguageColor(repo.language), this.currentUserId);
 				// 合并现有自定义数据（保留用户标签和删除状态）
 				const existingData = existingDataMap.get(dbRepo.id);
 				if (existingData) {
@@ -340,12 +453,12 @@ export default class StarVaultPlugin extends Plugin {
 			await db.bulkUpsertRepos(dbRepos);
 
 			// 第四步：重建搜索索引
-			new Notice('正在构建搜索索引...');
+			new Notice('Building search index...');
 			await searchService.buildIndex();
 
-			// 第五步：从 IndexedDB 加载所有数据（包含软删除的）
-			new Notice('正在加载本地数据...');
-			const allRepos = await db.repos.toArray();
+			// 第五步：从 IndexedDB 加载当前用户的数据（包含软删除的）
+			new Notice('Loading local data...');
+			const allRepos = await db.repos.where('userId').equals(this.currentUserId).toArray();
 
 			const starredRepos: StarredRepo[] = allRepos.map(repo => ({
 				id: repo.id || 0,
@@ -372,9 +485,9 @@ export default class StarVaultPlugin extends Plugin {
 			}
 
 			// 完成
-			new Notice(`同步完成！共 ${rawRepos.length} 个仓库`);
+			new Notice(t('notices.syncSuccess', this.settings.language) + ` ${rawRepos.length} repos`);
 		} catch (error) {
-			new Notice('同步失败: ' + (error instanceof Error ? error.message : '未知错误'));
+			new Notice(t('notices.syncFailed', this.settings.language) + (error instanceof Error ? error.message : 'Unknown error'));
 		}
 	}
 
@@ -410,6 +523,7 @@ export default class StarVaultPlugin extends Plugin {
 	 * 发射仓库选择事件
 	 */
 	emitRepoSelected(repo: StarredRepo): void {
+		console.log('emitRepoSelected called for repo:', repo.owner, repo.name);
 		// 在编辑器区打开 README 视图
 		this.openRepoReadmeView(repo);
 		// 在右侧边栏打开详情视图
@@ -420,23 +534,31 @@ export default class StarVaultPlugin extends Plugin {
 	 * 打开仓库详情视图（右侧边栏）
 	 */
 	private async openRepoDetailView(repo: StarredRepo): Promise<void> {
+		console.log('openRepoDetailView called');
 		const { workspace } = this.app;
 
 		// 检查是否已存在该视图
 		let leaf = workspace.getLeavesOfType(VIEW_TYPE_STARNEST_DETAIL)[0];
+		console.log('Existing detail leaf:', leaf);
 
 		if (!leaf) {
 			// 在右侧边栏创建新视图
+			console.log('Creating new detail leaf in right sidebar');
 			leaf = workspace.getRightLeaf(false) as WorkspaceLeaf;
 			await leaf.setViewState({ type: VIEW_TYPE_STARNEST_DETAIL });
+			console.log('New detail leaf created:', leaf);
 		}
 
 		// 聚焦到该视图
 		workspace.revealLeaf(leaf);
 
 		// 更新详情视图内容
-		if (this.detailView) {
-			this.detailView.showRepoDetail(repo);
+		// 直接从 leaf 获取视图实例，确保视图已正确初始化
+		const view = leaf.view as StarVaultDetailView;
+		console.log('Detail view instance:', view);
+		if (view) {
+			console.log('Calling showRepoDetail');
+			view.showRepoDetail(repo);
 		}
 	}
 
@@ -459,8 +581,10 @@ export default class StarVaultPlugin extends Plugin {
 		workspace.revealLeaf(leaf);
 
 		// 更新 README 视图内容
-		if (this.readmeView) {
-			this.readmeView.showRepoReadme(repo);
+		// 直接从 leaf 获取视图实例，确保视图已正确初始化
+		const view = leaf.view as StarVaultReadmeView;
+		if (view) {
+			view.showRepoReadme(repo);
 		}
 	}
 
@@ -589,7 +713,7 @@ export default class StarVaultPlugin extends Plugin {
       
       // 保存笔记到数据库（包含仓库名称）
       const repoName = `${repo.owner}/${repo.name}`;
-      await db.createNote(repo.id, repoName, fileName, content, fullPath);
+      await db.createNote(repo.id, repoName, fileName, content, fullPath, this.currentUserId);
       
       // 打开文件
       await this.app.workspace.getLeaf().openFile(file);
@@ -617,7 +741,7 @@ export default class StarVaultPlugin extends Plugin {
         
         // 如果右侧边栏正在显示这个仓库的详情，刷新笔记列表
         if (this.detailView && this.detailView.currentRepo?.id === note.repoId) {
-          this.detailView.currentNotes = await db.getNotesByRepoId(note.repoId);
+          this.detailView.currentNotes = await db.getNotesByRepoId(note.repoId, this.currentUserId);
           this.detailView.render();
         }
       }
@@ -640,7 +764,7 @@ export default class StarVaultPlugin extends Plugin {
         
         // 如果右侧边栏正在显示这个仓库的详情，刷新笔记列表
         if (this.detailView && this.detailView.currentRepo?.id === note.repoId) {
-          this.detailView.currentNotes = await db.getNotesByRepoId(note.repoId);
+          this.detailView.currentNotes = await db.getNotesByRepoId(note.repoId, this.currentUserId);
           this.detailView.render();
         }
       }

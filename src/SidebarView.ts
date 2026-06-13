@@ -15,6 +15,7 @@ import StarVaultPlugin from './main';
 import { db, DBRepo } from './db';
 import { searchService } from './search';
 import { ICONS } from 'constant';
+import { t } from './lang';
 
 export const VIEW_TYPE_STARNEST_SIDEBAR = 'starvault-sidebar';
 
@@ -95,6 +96,9 @@ export class StarVaultSidebarView extends ItemView {
     // 清空容器
     container.empty();
 
+    // 初始化 activeFilter（使用当前语言）
+    this.activeFilter = t('sidebar.all', this.plugin.settings.language);
+
     // 从 IndexedDB 加载仓库数据
     await this.loadReposFromDB();
 
@@ -120,7 +124,8 @@ export class StarVaultSidebarView extends ItemView {
   async loadReposFromDB(): Promise<void> {
     try {
       await db.open();
-      const dbRepos = await db.repos.toArray();
+      // 只加载当前用户的仓库
+      const dbRepos = await db.repos.where('userId').equals(this.plugin.currentUserId).toArray();
 
       if (!searchService.isReady()) {
         await searchService.buildIndex();
@@ -178,9 +183,9 @@ export class StarVaultSidebarView extends ItemView {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 60) return `${diffMins}分钟前`;
-    if (diffHours < 24) return `${diffHours}小时前`;
-    if (diffDays < 30) return `${diffDays}天前`;
+    if (diffMins < 60) return t('sidebar.timeMinutesAgo', this.plugin.settings.language).replace('{count}', diffMins.toString());
+    if (diffHours < 24) return t('sidebar.timeHoursAgo', this.plugin.settings.language).replace('{count}', diffHours.toString());
+    if (diffDays < 30) return t('sidebar.timeDaysAgo', this.plugin.settings.language).replace('{count}', diffDays.toString());
     return date.toLocaleDateString();
   }
 
@@ -212,11 +217,11 @@ export class StarVaultSidebarView extends ItemView {
     // 用户信息
     const userInfo = userContainer.createDiv('user-info');
     const userName = userInfo.createEl('span', {
-      text: this.plugin.settings.username || '未登录',
+      text: this.plugin.settings.username || t('sidebar.notLoggedIn', this.plugin.settings.language),
       cls: 'user-name'
     });
     const userCount = userInfo.createEl('span', {
-      text: `${this.repos.length} 个仓库`,
+      text: `${this.repos.length} ${t('sidebar.repos', this.plugin.settings.language)}`,
       cls: 'user-count'
     });
 
@@ -227,7 +232,7 @@ export class StarVaultSidebarView extends ItemView {
     const syncBtn = this.createHeaderButton(
       buttonContainer,
       'refresh-cw',
-      '同步 GitHub Stars',
+      t('sidebar.syncButton', this.plugin.settings.language),
       () => this.syncStars()
     );
     syncBtn.addClass('starvault-sync-btn');
@@ -236,7 +241,7 @@ export class StarVaultSidebarView extends ItemView {
     this.sortButton = this.createHeaderButton(
       buttonContainer,
       'arrow-up-down',
-      '排序',
+      t('sidebar.sort', this.plugin.settings.language),
       (evt) => this.showSortMenu(evt)
     );
 
@@ -244,7 +249,7 @@ export class StarVaultSidebarView extends ItemView {
     this.createHeaderButton(
       buttonContainer,
       'more-vertical',
-      '更多选项',
+      t('sidebar.moreOptions', this.plugin.settings.language),
       (evt) => this.showMoreMenu(evt)
     );
   }
@@ -304,7 +309,7 @@ export class StarVaultSidebarView extends ItemView {
     // 搜索输入框
     this.searchInput = searchWrapper.createEl('input', {
       type: 'text',
-      placeholder: '搜索仓库...',
+      placeholder: t('sidebar.searchPlaceholder', this.plugin.settings.language),
       cls: 'search-input'
     });
 
@@ -350,7 +355,7 @@ export class StarVaultSidebarView extends ItemView {
     this.filterContainer.empty();
 
     // 内置筛选器
-    const builtInFilters = ['全部'];
+    const builtInFilters = [t('sidebar.all', this.plugin.settings.language)];
 
     // 所有自定义标签（按字母排序）
     const allTags = Array.from(new Set(
@@ -366,7 +371,7 @@ export class StarVaultSidebarView extends ItemView {
       });
 
       // 如果是标签，添加颜色
-      if (filter !== '全部') {
+      if (filter !== t('sidebar.all', this.plugin.settings.language)) {
         pill.style.backgroundColor = `${this.getTagColor(filter)}1a`;
         pill.style.color = this.getTagColor(filter);
         pill.style.border = `1px solid ${this.getTagColor(filter)}33`;
@@ -398,7 +403,7 @@ export class StarVaultSidebarView extends ItemView {
   public renderRepoList(): void {
     // 检查容器是否已初始化
     if (!this.repoListContainer) {
-      console.log('StarVault: repoListContainer 尚未初始化，跳过渲染');
+      console.log(t('sidebar.repoListNotInitialized', this.plugin.settings.language));
       return;
     }
     
@@ -490,9 +495,9 @@ export class StarVaultSidebarView extends ItemView {
       displayTags.forEach(tag => {
         const tagEl = tagsContainer.createEl('span', {
           text: tag,
-          cls: `repo-item-tag${tag === '归档' ? ' repo-item-tag-archived' : ''}`
+          cls: `repo-item-tag${tag === t('sidebar.archived', this.plugin.settings.language) ? ' repo-item-tag-archived' : ''}`
         });
-        if (tag === '归档') {
+        if (tag === t('sidebar.archived', this.plugin.settings.language)) {
           tagEl.style.backgroundColor = 'rgba(150, 150, 150, 0.1)';
           tagEl.style.color = '#999';
           tagEl.style.border = '1px solid rgba(150, 150, 150, 0.3)';
@@ -505,8 +510,9 @@ export class StarVaultSidebarView extends ItemView {
 
       // 如果标签数量超过3个，显示"+x标签"
       if (remainingCount > 0) {
+        const moreTagText = t('sidebar.moreTags', this.plugin.settings.language).replace('{count}', remainingCount.toString());
         const moreTag = tagsContainer.createEl('span', {
-          text: `+${remainingCount}标签`,
+          text: moreTagText,
           cls: 'repo-item-tag repo-item-tag-more'
         });
         moreTag.style.backgroundColor = 'rgba(100, 100, 100, 0.08)';
@@ -541,14 +547,14 @@ export class StarVaultSidebarView extends ItemView {
 
     emptyState.createEl('p', {
       text: this.searchQuery
-        ? '没有找到匹配的仓库'
-        : '还没有收藏的仓库',
+        ? t('sidebar.emptySearch', this.plugin.settings.language)
+        : t('sidebar.emptyNoRepos', this.plugin.settings.language),
       cls: 'empty-title'
     });
 
     if (!this.searchQuery) {
       emptyState.createEl('p', {
-        text: '点击上方同步按钮获取你的 GitHub Stars',
+        text: t('sidebar.emptyHint', this.plugin.settings.language),
         cls: 'empty-desc'
       });
     }
@@ -572,7 +578,7 @@ export class StarVaultSidebarView extends ItemView {
     this.plugin.emitRepoSelected(repo);
 
     // 显示通知
-    new Notice(`已选择: ${repo.owner}/${repo.name}`);
+    new Notice(t('sidebar.selected', this.plugin.settings.language).replace('{name}', `${repo.owner}/${repo.name}`));
   }
 
   /**
@@ -592,7 +598,7 @@ export class StarVaultSidebarView extends ItemView {
     }
 
     // 分类过滤（按自定义标签）
-    if (this.activeFilter !== '全部') {
+    if (this.activeFilter !== t('sidebar.all', this.plugin.settings.language)) {
       result = result.filter(repo => repo.tags.includes(this.activeFilter));
     }
 
@@ -634,12 +640,12 @@ export class StarVaultSidebarView extends ItemView {
     const menu = new Menu();
 
     const sortOptions: { label: string; value: SortOption }[] = [
-      { label: 'Star 数（高 → 低）', value: SortOption.STARS_DESC },
-      { label: 'Star 数（低 → 高）', value: SortOption.STARS_ASC },
-      { label: '最近更新', value: SortOption.UPDATED_DESC },
-      { label: '最早更新', value: SortOption.UPDATED_ASC },
-      { label: '名称（A → Z）', value: SortOption.NAME_ASC },
-      { label: '名称（Z → A）', value: SortOption.NAME_DESC },
+      { label: t('sidebar.sortStarsDesc', this.plugin.settings.language), value: SortOption.STARS_DESC },
+      { label: t('sidebar.sortStarsAsc', this.plugin.settings.language), value: SortOption.STARS_ASC },
+      { label: t('sidebar.sortUpdatedDesc', this.plugin.settings.language), value: SortOption.UPDATED_DESC },
+      { label: t('sidebar.sortUpdatedAsc', this.plugin.settings.language), value: SortOption.UPDATED_ASC },
+      { label: t('sidebar.sortNameAsc', this.plugin.settings.language), value: SortOption.NAME_ASC },
+      { label: t('sidebar.sortNameDesc', this.plugin.settings.language), value: SortOption.NAME_DESC },
     ];
 
     sortOptions.forEach(option => {
@@ -650,7 +656,7 @@ export class StarVaultSidebarView extends ItemView {
           .onClick(() => {
             this.currentSort = option.value;
             this.applyFilters();
-            new Notice(`已按: ${option.label} 排序`);
+            new Notice(t('sidebar.sortedByNotification', this.plugin.settings.language).replace('{name}', option.label));
           });
       });
     });
@@ -666,7 +672,7 @@ export class StarVaultSidebarView extends ItemView {
 
     menu.addItem((item) => {
       item
-        .setTitle('设置')
+        .setTitle(t('sidebar.settings', this.plugin.settings.language))
         .setIcon('settings')
         .onClick(() => {
           // 打开设置
@@ -677,7 +683,7 @@ export class StarVaultSidebarView extends ItemView {
 
     menu.addItem((item) => {
       item
-        .setTitle('导出 Stars')
+        .setTitle(t('sidebar.exportStars', this.plugin.settings.language))
         .setIcon('download')
         .onClick(() => this.exportStars());
     });
@@ -686,7 +692,7 @@ export class StarVaultSidebarView extends ItemView {
 
     menu.addItem((item) => {
       item
-        .setTitle('刷新')
+        .setTitle(t('sidebar.refresh', this.plugin.settings.language))
         .setIcon('refresh-cw')
         .onClick(() => this.syncStars());
     });
@@ -702,7 +708,7 @@ export class StarVaultSidebarView extends ItemView {
 
     menu.addItem((item) => {
       item
-        .setTitle('在 Obsidian 中打开')
+        .setTitle(t('sidebar.openInObsidian', this.plugin.settings.language))
         .setIcon('external-link')
         .onClick(async () => {
           const url = `https://github.com/${repo.owner}/${repo.name}`;
@@ -712,11 +718,11 @@ export class StarVaultSidebarView extends ItemView {
 
     menu.addItem((item) => {
       item
-        .setTitle('复制 Clone URL')
+        .setTitle(t('sidebar.copyCloneUrl', this.plugin.settings.language))
         .setIcon('copy')
         .onClick(() => {
           navigator.clipboard.writeText(`https://github.com/${repo.owner}/${repo.name}.git`);
-          new Notice('已复制到剪贴板');
+          new Notice(t('sidebar.copiedToClipboard', this.plugin.settings.language));
         });
     });
 
@@ -724,14 +730,14 @@ export class StarVaultSidebarView extends ItemView {
 
     menu.addItem((item) => {
       item
-        .setTitle('自定义标签')
+        .setTitle(t('sidebar.customTags', this.plugin.settings.language))
         .setIcon('tag')
         .onClick(() => this.openTagEditor(repo));
     });
 
     menu.addItem((item) => {
       item
-        .setTitle('创建笔记')
+        .setTitle(t('sidebar.createNote', this.plugin.settings.language))
         .setIcon('file-plus')
         .onClick(() => this.createRepoNote(repo));
     });
@@ -740,7 +746,7 @@ export class StarVaultSidebarView extends ItemView {
 
     menu.addItem((item) => {
       item
-        .setTitle('取消 Star')
+        .setTitle(t('detailView.cancelStar', this.plugin.settings.language))
         .setIcon('star-off')
         .onClick(() => this.unstarRepo(repo));
     });
@@ -760,7 +766,7 @@ export class StarVaultSidebarView extends ItemView {
     try {
       await this.plugin.syncGitHubStars();
     } catch (error: any) {
-      new Notice('同步失败: ' + (error.message || '未知错误'));
+      new Notice(t('sidebar.syncFailed', this.plugin.settings.language) + (error.message || 'Unknown error'));
     } finally {
       if (syncBtn) {
         syncBtn.removeClass('is-syncing');
@@ -773,7 +779,7 @@ export class StarVaultSidebarView extends ItemView {
    */
   private async createNewNote(): Promise<void> {
     if (!this.selectedRepo) {
-      new Notice('请先选择一个仓库');
+      new Notice(t('sidebar.pleaseSelectRepo', this.plugin.settings.language));
       return;
     }
 
@@ -782,9 +788,9 @@ export class StarVaultSidebarView extends ItemView {
     try {
       // 使用插件的模板方法创建笔记
       await this.plugin.createRepoNoteWithTemplate(repo);
-      new Notice(`已为 ${repo.owner}/${repo.name} 创建笔记`);
+      new Notice(t('detailView.createNoteSuccess', this.plugin.settings.language).replace('{name}', `${repo.owner}/${repo.name}`));
     } catch (error: any) {
-      new Notice('创建笔记失败: ' + error.message);
+      new Notice(t('sidebar.createNoteFailed', this.plugin.settings.language) + error.message);
     }
   }
 
@@ -795,9 +801,9 @@ export class StarVaultSidebarView extends ItemView {
     try {
       // 调用插件的模板方法创建笔记
       await this.plugin.createRepoNoteWithTemplate(repo);
-      new Notice(`已为 ${repo.name} 创建笔记`);
+      new Notice(t('detailView.createNoteSuccess', this.plugin.settings.language).replace('{name}', repo.name));
     } catch (error: any) {
-      new Notice('创建笔记失败: ' + error.message);
+      new Notice(t('sidebar.createNoteFailed', this.plugin.settings.language) + error.message);
     }
   }
 
@@ -825,26 +831,26 @@ export class StarVaultSidebarView extends ItemView {
                   ${tag}
                   <span class="starvault-tag-remove">&times;</span>
                 </span>
-              `).join('') : '<p class="starvault-empty-text">暂无标签</p>'}
+              `).join('') : `<p class="starvault-empty-text">${t('sidebar.noTags', this.plugin.settings.language)}</p>`}
             </div>
           </div>
           <div class="starvault-tags-section">
-            <h4>已有标签</h4>
+            <h4>${t('sidebar.tags', this.plugin.settings.language)}</h4>
             <div class="starvault-existing-tags">
               ${allTags.filter(t => !currentTags.includes(t)).length > 0 
                 ? allTags.filter(t => !currentTags.includes(t)).map(tag => `
                   <span class="starvault-tag-suggestion" data-tag="${tag}">${tag}</span>
                 `).join('')
-                : '<p class="starvault-empty-text">无其他标签</p>'}
+                : `<p class="starvault-empty-text">${t('sidebar.noOtherTags', this.plugin.settings.language)}</p>`}
             </div>
           </div>
           <div class="starvault-tags-section">
-            <h4>添加新标签</h4>
-            <input type="text" class="starvault-tag-input" placeholder="输入标签（按 Enter 确认）" />
+            <h4>Add New Tag</h4>
+            <input type="text" class="starvault-tag-input" placeholder="Enter tag (press Enter to confirm)" />
           </div>
         </div>
         <div class="starvault-modal-footer">
-          <button class="starvault-modal-btn starvault-modal-btn-primary">保存</button>
+          <button class="starvault-modal-btn starvault-modal-btn-primary">Save</button>
         </div>
       </div>
     `;
@@ -862,7 +868,7 @@ export class StarVaultSidebarView extends ItemView {
       if (updatedRepo) {
         this.plugin.emitRepoSelected(updatedRepo);
       }
-      new Notice('标签已保存');
+      new Notice(t('sidebar.tagsSaved', this.plugin.settings.language));
       closeModal();
     };
 
@@ -906,7 +912,7 @@ export class StarVaultSidebarView extends ItemView {
             });
           });
         } else {
-          container.innerHTML = '<p class="starvault-empty-text">暂无标签</p>';
+          container.innerHTML = `<p class="starvault-empty-text">${t('sidebar.noTags', this.plugin.settings.language)}</p>`;
         }
       }
     };
@@ -925,7 +931,7 @@ export class StarVaultSidebarView extends ItemView {
             });
           });
         } else {
-          container.innerHTML = '<p class="starvault-empty-text">无其他标签</p>';
+          container.innerHTML = `<p class="starvault-empty-text">${t('sidebar.noOtherTags', this.plugin.settings.language)}</p>`;
         }
       }
     };
@@ -976,7 +982,7 @@ export class StarVaultSidebarView extends ItemView {
     a.click();
 
     URL.revokeObjectURL(url);
-    new Notice('Stars 已导出');
+    new Notice(t('sidebar.starsExported', this.plugin.settings.language));
   }
 
   /**
@@ -1043,7 +1049,7 @@ export class StarVaultSidebarView extends ItemView {
         createdAt: new Date(repo.createdAt).toLocaleDateString('zh-CN'),
         starredAt: '',
         topics: repo.topics,
-        tags: (repo.deletedAt ? [...repo.tags, '归档'] : repo.tags),
+        tags: (repo.deletedAt ? [...repo.tags, t('sidebar.archived', this.plugin.settings.language)] : repo.tags),
         isArchived: repo.isArchived,
         url: repo.htmlUrl,
         deletedAt: repo.deletedAt || null,
@@ -1053,7 +1059,7 @@ export class StarVaultSidebarView extends ItemView {
 
     const userCount = this.containerEl.querySelector('.user-count');
     if (userCount) {
-      userCount.setText(`${this.repos.length} 个仓库`);
+      userCount.setText(`${this.repos.length} ${t('sidebar.repos', this.plugin.settings.language)}`);
     }
   }
 
@@ -1097,7 +1103,7 @@ export class StarVaultSidebarView extends ItemView {
     // 更新用户名
     const userName = this.containerEl.querySelector('.user-name');
     if (userName) {
-      userName.setText(this.plugin.settings.username || '未登录');
+      userName.setText(this.plugin.settings.username || t('sidebar.notLoggedIn', this.plugin.settings.language));
     }
 
     // 更新头像

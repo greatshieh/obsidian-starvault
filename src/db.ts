@@ -7,6 +7,7 @@ import Dexie, { Table } from 'dexie';
 /** 仓库数据 */
 export interface DBRepo {
   id: number;                    // GitHub repo ID（主键）
+  userId: string;                // 所属用户 ID
   owner: string;                 // 所有者
   name: string;                  // 仓库名
   fullName: string;              // owner/name（冗余，方便搜索）
@@ -33,6 +34,7 @@ export interface DBRepo {
 /** 用户笔记 */
 interface DBNote {
   id: string;                    // UUID（主键）
+  userId: string;                // 所属用户 ID
   repoId: number;                // 关联的仓库 ID
   repoName: string;              // 仓库全名（owner/name），用于显示孤立笔记
   title: string;                 // 笔记标题
@@ -62,6 +64,18 @@ interface DBRepoTag {
   createdAt: number;             // 添加时间戳
 }
 
+/** GitHub 用户（多用户支持）*/
+export interface DBUser {
+  id: string;                    // UUID（主键）
+  name: string;                  // 用户自定义名称
+  token: string;                 // GitHub Personal Access Token
+  isActive: boolean;             // 是否为当前活跃用户
+  createdAt: number;             // 创建时间戳
+  updatedAt: number;             // 更新时间戳
+  login: string;                 // GitHub 用户名
+  avatarUrl: string;             // GitHub 头像 URL
+}
+
 /** 同步状态 */
 interface DBSyncState {
   id: 'sync-state';              // 固定 ID（单例）
@@ -82,67 +96,374 @@ class StarVaultDB extends Dexie {
   tags!: Table<DBTag, string>;
   repoTags!: Table<DBRepoTag, [number, string]>;
   syncState!: Table<DBSyncState, string>;
+  users!: Table<DBUser, string>;
 
   constructor() {
     super('StarVaultDB');
     
+    // 版本 1：原始结构
     this.version(1).stores({
-      // 仓库表：主键 id，多个索引用于排序和过滤
       repos: [
-        'id',                          // 主键
-        'owner',                       // 按所有者查询
-        'name',                        // 按名称查询
-        'fullName',                    // owner/name 组合查询
-        'language',                    // 按语言过滤
-        'stars',                       // 按 Star 数排序
-        'forks',                       // 按 Fork 数排序
-        'pushedAt',                    // 按推送时间排序
-        'createdAt',                   // 按创建时间排序
-        'updatedAt',                   // 按更新时间排序
-        'syncedAt',                    // 按同步时间排序
-        'isArchived',                  // 过滤归档仓库
-        '*tags',                       // 多值索引：按标签查询
-        '*topics',                     // 多值索引：按 Topic 查询
+        'id',
+        'owner',
+        'name',
+        'fullName',
+        'language',
+        'stars',
+        'forks',
+        'pushedAt',
+        'createdAt',
+        'updatedAt',
+        'syncedAt',
+        'isArchived',
+        '*tags',
+        '*topics',
       ].join(','),
-      
-      // 笔记表
       notes: [
-        'id',                          // 主键
-        'repoId',                      // 按仓库 ID 查询
-        'title',                       // 按标题查询
-        'filePath',                    // 按文件路径查询（检查重复关联）
-        'createdAt',                   // 按创建时间排序
-        'updatedAt',                   // 按更新时间排序
-        '*tags',                       // 多值索引：按标签查询
+        'id',
+        'repoId',
+        'title',
+        'filePath',
+        'createdAt',
+        'updatedAt',
+        '*tags',
       ].join(','),
-      
-      // 标签表
-      tags: [
-        'id',                          // 主键
-        '&name',                       // 唯一索引：标签名
-        'order',                       // 排序权重
-      ].join(','),
-      
-      // 仓库-标签关联表
-      repoTags: [
-        '[repoId+tagId]',              // 复合主键
-        'repoId',                      // 按仓库查询标签
-        'tagId',                       // 按标签查询仓库
-      ].join(','),
-      
-      // 同步状态（单例）
+      tags: 'id,&name,order',
+      repoTags: '[repoId+tagId],repoId,tagId',
       syncState: 'id',
+    });
+    
+    // 版本 2：添加 userId 支持和多用户
+    this.version(2).stores({
+      repos: [
+        'id',
+        'userId',
+        'owner',
+        'name',
+        'fullName',
+        'language',
+        'stars',
+        'forks',
+        'pushedAt',
+        'createdAt',
+        'updatedAt',
+        'syncedAt',
+        'isArchived',
+        '*tags',
+        '*topics',
+      ].join(','),
+      notes: [
+        'id',
+        'userId',
+        'repoId',
+        'title',
+        'filePath',
+        'createdAt',
+        'updatedAt',
+        '*tags',
+      ].join(','),
+      tags: 'id,&name,order',
+      repoTags: '[repoId+tagId],repoId,tagId',
+      syncState: 'id',
+      users: 'id,isActive',
+    }).upgrade(async tx => {
+      // 从 v1 升级到 v2：添加 userId 字段和默认用户
+      // 先检查是否已存在默认用户，避免重复添加
+      const existingUser = await tx.table('users').get('default');
+      if (!existingUser) {
+        await tx.table('users').add({
+          id: 'default',
+          name: '默认账号',
+          token: '',
+          isActive: true,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          login: '',
+          avatarUrl: '',
+        });
+      }
       
-      // 用户信息（单例）
-      user: 'id',
+      // 为所有 repos 添加 userId（如果还没有）
+      await tx.table('repos').toCollection().modify(repo => {
+        if (!repo.userId) {
+          repo.userId = 'default';
+        }
+      });
+      
+      // 为所有 notes 添加 userId（如果还没有）
+      await tx.table('notes').toCollection().modify(note => {
+        if (!note.userId) {
+          note.userId = 'default';
+        }
+      });
+    });
+    
+    // 版本 3：添加复合索引 [repoId+userId]
+    this.version(3).stores({
+      repos: [
+        'id',
+        'userId',
+        'owner',
+        'name',
+        'fullName',
+        'language',
+        'stars',
+        'forks',
+        'pushedAt',
+        'createdAt',
+        'updatedAt',
+        'syncedAt',
+        'isArchived',
+        '*tags',
+        '*topics',
+      ].join(','),
+      notes: [
+        'id',
+        'userId',
+        'repoId',
+        '[repoId+userId]',
+        'title',
+        'filePath',
+        'createdAt',
+        'updatedAt',
+        '*tags',
+      ].join(','),
+      tags: 'id,&name,order',
+      repoTags: '[repoId+tagId],repoId,tagId',
+      syncState: 'id',
+      users: 'id,isActive',
     });
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 用户管理（多用户支持）
+  // ═══════════════════════════════════════════════════════════════
+
+  /**
+   * 获取所有用户
+   */
+  async getAllUsers(): Promise<DBUser[]> {
+    return this.users.toArray();
+  }
+
+  /**
+   * 获取当前活跃用户
+   */
+  async getActiveUser(): Promise<DBUser | undefined> {
+    return this.users.where('isActive').equals(1).first();
+  }
+
+  /**
+   * 获取用户
+   */
+  async getUser(userId: string): Promise<DBUser | undefined> {
+    return this.users.get(userId);
+  }
+
+  /**
+   * 添加用户
+   */
+  async addUser(user: DBUser): Promise<string> {
+    const now = Date.now();
+    const newUser: DBUser = {
+      ...user,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.users.add(newUser);
+    return newUser.id;
+  }
+
+  /**
+   * 更新用户
+   */
+  async updateUser(userId: string, updates: Partial<Omit<DBUser, 'id' | 'createdAt'>>): Promise<void> {
+    await this.users.update(userId, {
+      ...updates,
+      updatedAt: Date.now(),
+    });
+  }
+
+  /**
+   * 删除用户
+   */
+  async deleteUser(userId: string): Promise<void> {
+    // 不删除用户的所有仓库和笔记（保留数据）
+    await this.users.delete(userId);
+  }
+
+  /**
+   * 切换活跃用户
+   */
+  async switchActiveUser(userId: string): Promise<void> {
+    await this.transaction('rw', 'users', async () => {
+      // 取消所有用户的活跃状态
+      await this.users.toCollection().modify({ isActive: false });
+      // 设置目标用户为活跃
+      await this.users.update(userId, { isActive: true, updatedAt: Date.now() });
+    });
+  }
+
+  /**
+   * 获取用户的仓库数量
+   */
+  async getUserRepoCount(userId: string): Promise<number> {
+    return this.repos.where('userId').equals(userId).count();
+  }
+
+  /**
+   * 获取用户的笔记数量
+   */
+  async getUserNoteCount(userId: string): Promise<number> {
+    return this.notes.where('userId').equals(userId).count();
+  }
+
+  /**
+   * 导出所有数据（用于备份）
+   */
+  async exportAllData(): Promise<string> {
+    const users = await this.getAllUsers();
+    const repos = await this.repos.toArray();
+    const notes = await this.notes.toArray();
+    const tags = await this.tags.toArray();
+    const repoTags = await this.repoTags.toArray();
+
+    const exportData = {
+      version: '0.1.3',
+      exportTime: Date.now(),
+      users,
+      repos,
+      notes,
+      tags,
+      repoTags,
+    };
+
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  /**
+   * 导入数据（用于恢复备份）
+   */
+  async importData(jsonString: string): Promise<void> {
+    let importData;
+    try {
+      importData = JSON.parse(jsonString);
+    } catch {
+      throw new Error('无效的 JSON 数据');
+    }
+
+    if (!importData.version) {
+      throw new Error('不支持的数据格式版本');
+    }
+
+    await this.transaction('rw', ['users', 'repos', 'notes', 'tags', 'repoTags'], async () => {
+      // 清空现有数据
+      await this.users.clear();
+      await this.repos.clear();
+      await this.notes.clear();
+      await this.tags.clear();
+      await this.repoTags.clear();
+
+      // 导入数据
+      if (importData.users) {
+        await this.users.bulkAdd(importData.users);
+      }
+      if (importData.repos) {
+        await this.repos.bulkAdd(importData.repos);
+      }
+      if (importData.notes) {
+        await this.notes.bulkAdd(importData.notes);
+      }
+      if (importData.tags) {
+        await this.tags.bulkAdd(importData.tags);
+      }
+      if (importData.repoTags) {
+        await this.repoTags.bulkAdd(importData.repoTags);
+      }
+    });
+  }
+
+  /**
+   * 导出单个用户数据
+   */
+  async exportUserData(userId: string): Promise<string> {
+    const user = await this.getUser(userId);
+    const repos = await this.repos.where('userId').equals(userId).toArray();
+    const notes = await this.notes.where('userId').equals(userId).toArray();
+
+    const exportData = {
+      version: '0.1.3',
+      exportTime: Date.now(),
+      user,
+      repos,
+      notes,
+    };
+
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  /**
+   * 导入用户数据（合并模式，不覆盖现有数据）
+   */
+  async importUserData(jsonString: string): Promise<string> {
+    let importData;
+    try {
+      importData = JSON.parse(jsonString);
+    } catch {
+      throw new Error('无效的 JSON 数据');
+    }
+
+    if (!importData.version) {
+      throw new Error('不支持的数据格式版本');
+    }
+
+    if (!importData.user || !importData.repos) {
+      throw new Error('数据不完整');
+    }
+
+    // 生成新的用户 ID
+    const newUserId = crypto.randomUUID();
+    const user = {
+      ...importData.user,
+      id: newUserId,
+      isActive: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await this.transaction('rw', 'users', 'repos', 'notes', async () => {
+      // 添加用户
+      await this.users.add(user);
+
+      // 添加仓库（更新 userId）
+      const repos = importData.repos.map((repo: DBRepo) => ({
+        ...repo,
+        userId: newUserId,
+      }));
+      await this.repos.bulkAdd(repos);
+
+      // 添加笔记（更新 userId）
+      if (importData.notes) {
+        const notes = importData.notes.map((note: any) => ({
+          ...note,
+          userId: newUserId,
+        }));
+        await this.notes.bulkAdd(notes);
+      }
+    });
+
+    return newUserId;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 仓库管理
+  // ═══════════════════════════════════════════════════════════════
 
   /**
    * 批量保存或更新仓库
    */
   async bulkUpsertRepos(repos: DBRepo[]): Promise<void> {
-    await this.transaction('rw', this.repos, async () => {
+    await this.transaction('rw', 'repos', async () => {
       for (const repo of repos) {
         await this.repos.put(repo);
       }
@@ -189,7 +510,7 @@ class StarVaultDB extends Dexie {
   async checkDataIntegrity(): Promise<number> {
     let markedCount = 0;
     
-    await this.transaction('rw', [this.repos, this.notes], async () => {
+    await this.transaction('rw', ['repos', 'notes'], async () => {
       // 获取所有仓库 ID
       const repos = await this.repos.toArray();
       const validRepoIds = new Set(repos.map(r => r.id));
@@ -250,7 +571,7 @@ class StarVaultDB extends Dexie {
    * 包括：删除仓库记录、删除仓库-标签关联、标记笔记为孤立状态
    */
   async hardDeleteRepo(repoId: number): Promise<void> {
-    await this.transaction('rw', [this.repos, this.repoTags, this.notes], async () => {
+    await this.transaction('rw', ['repos', 'repoTags', 'notes'], async () => {
       // 1. 删除仓库-标签关联
       await this.repoTags.where('repoId').equals(repoId).delete();
       
@@ -290,10 +611,11 @@ class StarVaultDB extends Dexie {
   /**
    * 创建笔记
    */
-  async createNote(repoId: number, repoName: string, title: string, content: string, filePath: string): Promise<DBNote> {
+  async createNote(repoId: number, repoName: string, title: string, content: string, filePath: string, userId: string = 'default'): Promise<DBNote> {
     const now = Date.now();
     const note: DBNote = {
       id: crypto.randomUUID(),
+      userId,
       repoId,
       repoName,
       title,
@@ -311,7 +633,10 @@ class StarVaultDB extends Dexie {
   /**
    * 获取仓库的所有笔记
    */
-  async getNotesByRepoId(repoId: number): Promise<DBNote[]> {
+  async getNotesByRepoId(repoId: number, userId?: string): Promise<DBNote[]> {
+    if (userId) {
+      return this.notes.where(['repoId', 'userId']).equals([repoId, userId]).toArray();
+    }
     return this.notes.where('repoId').equals(repoId).toArray();
   }
 
@@ -361,6 +686,7 @@ class StarVaultDB extends Dexie {
     const now = Date.now();
     const note: DBNote = {
       id: crypto.randomUUID(),
+      userId: 'default',  // TODO: 需要传入当前用户 ID
       repoId,
       repoName,
       title: fileName,
@@ -397,11 +723,12 @@ class StarVaultDB extends Dexie {
 /**
  * 将 GitHub API 响应转换为 DBRepo 格式
  */
-export function githubRepoToDBRepo(item: any, languageColor: string): DBRepo {
+export function githubRepoToDBRepo(item: any, languageColor: string, userId: string = 'default'): DBRepo {
   const ownerLogin = item.owner?.login || 'unknown';
   
   return {
     id: item.id || 0,
+    userId: userId,
     owner: ownerLogin,
     name: item.name || 'repo',
     fullName: item.full_name || `${ownerLogin}/repo`,
